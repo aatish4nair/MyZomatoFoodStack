@@ -1,9 +1,9 @@
 # Product requirements: My Zomato Food Stack
 
-**Visual specification:** the approved design screenshot. It should be stored at
-`docs/design/approved-design.png` (**not yet added**; needed before Phase 1 UI work). The page
-must match it faithfully: no redesign, no dashboard cards, no extra UI, and no emoji in place of
-food artwork.
+**Visual specification:** [`docs/design/approved-design.png`](../design/approved-design.png), an
+example with dummy data, described in [`DESIGN-SPEC.md`](../design/DESIGN-SPEC.md). The page must
+match it faithfully: no redesign, no dashboard cards, no extra UI, and no emoji in place of food
+artwork.
 
 ## Page
 
@@ -44,12 +44,17 @@ food artwork.
   Script. That workflow is preserved and not modified.
 - The backend reads the sheet server-side (Phase 2). The frontend never sees credentials.
 
-## Known artwork issues (to resolve in Phase 1)
+## Artwork
 
-| Issue                                                                           | Why it matters                                              | Options                                                                               |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `chai.png` has steam rising from the cup                                        | Conflicts with "no decorative effects emerge from the food" | Edit the steam out, or regenerate using `docs/design/upstream-sprite-style-guide.txt` |
-| No `takeaway.png` fallback exists; the original app falls back to an emoji (🥡) | Emoji substitution is not allowed                           | Create a takeaway-box illustration, or exclude unmatched foods from the pile          |
-| Upstream draws drop shadows and a hover "grow" effect on items                  | Not part of the approved design                             | Leave them out when porting                                                           |
-| Upstream picture-matching rules (`CATS`) were written for Swiggy item names     | Zomato item names may map differently                       | Port the rules to `shared/`, then tune them against real sheet names (privately)      |
-| Upstream loads the Outfit font from Google Fonts                                | Breaks the strict CSP and leaks page views to a third party | Self-host whichever font the design uses                                              |
+**Decision (2026-10-09):** the owner will supply new artwork in the design's style, both pile
+items and plated dishes. See [`ART-BRIEF.md`](../design/ART-BRIEF.md). Until it arrives, the My
+Food Pile sprites serve as temporary placeholders. This resolves the earlier issues: the steam on
+`chai.png`, the missing takeaway fallback, and the style mismatch.
+
+Remaining points for Phase 1:
+
+| Issue                                                                       | Plan                                                                             |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Upstream draws drop shadows and a hover "grow" effect on items              | Leave them out when porting                                                      |
+| Upstream picture-matching rules (`CATS`) were written for Swiggy item names | Port the rules to `shared/`, then tune them against real sheet names (privately) |
+| Upstream loads the Outfit font from Google Fonts                            | Self-host whichever font the design uses (strict CSP)                            |
