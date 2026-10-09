@@ -46,11 +46,12 @@ implemented. Nothing marked [planned] should be assumed to protect anything toda
      `X-Forwarded-For`. This must be revisited when a reverse proxy is added.
 3. **Frontend bundle ↔ the public.** Anything in `frontend/` can be read by anyone who loads the
    page:
-   - **[in place]** The frontend contains no credentials and no order data. The only assets are the
-     public illustrations.
+   - **[in place]** The frontend contains no credentials and no real order data. Its assets are the
+     public illustrations, the self-hosted font, and a small **synthetic** demo dataset
+     (`frontend/src/services/demo-orders.ts`, all values invented) used until Phase 2.
    - **[in place]** The production build adds a CSP `<meta>` tag:
      `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'`.
-     There are no third-party scripts, fonts or CDNs; fonts will be self-hosted.
+     There are no third-party scripts, fonts or CDNs. The Outfit font is bundled and served from our own origin (verified in a headless-Chrome run of the production build: no CSP violations or console errors).
    - **[planned]** The static host should send the same CSP as a real HTTP header and add
      `frame-ancestors 'none'` (which `<meta>` can't express).
 

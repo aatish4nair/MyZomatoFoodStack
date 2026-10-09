@@ -1,9 +1,16 @@
-/* Design tokens. Exact values will be matched to the approved design in Phase 1. */
+/* Design tokens, read from docs/design/approved-design.png (see docs/design/DESIGN-SPEC.md). */
 :root {
-  --color-background: #faf6ef; /* warm off-white */
+  --color-background: #fbf8f3; /* warm off-white */
   --color-ink: #1c1c1c;
+  --color-muted: #55524d;
+  --color-faint: #a9a49c;
   --color-brand-red: #e23744;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-pill: #fce8e6;
+  --font-sans: 'Outfit Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --gutter: clamp(16px, 5vw, 80px);
+  /* Height of the footer food collage; the pile settles inside exactly this space. */
+  --pile-height: clamp(130px, 22vh, 240px);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 *,
@@ -19,17 +26,375 @@ body {
   background: var(--color-background);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- page layout ---------- */
+
 .app {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip; /* nothing may cause horizontal scrolling */
+}
+
+.app__content {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 54fr) minmax(0, 46fr);
+  gap: clamp(16px, 3vw, 48px);
+  padding: clamp(24px, 4.5vh, 48px) var(--gutter) clamp(16px, 3vh, 32px);
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* The interface appears only after the opening food fall has settled. */
+.app--ready .app__content {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.5s ease,
+    transform 0.6s var(--ease-out);
+}
+
+.app__left {
+  min-width: 0;
+}
+
+.app__right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* ---------- header ---------- */
+
+.app__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px clamp(16px, 2vw, 28px);
 }
 
 .app__title {
   margin: 0;
-  font-weight: 600;
+  font-size: clamp(28px, 2.9vw, 46px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
 }
 
 .app__brand {
   color: var(--color-brand-red);
+}
+
+.month {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.month__select {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-pill);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: clamp(14px, 1.15vw, 18px);
+  font-weight: 500;
+  padding: 0.85em 3.2em 0.85em 2em;
+  cursor: pointer;
+}
+
+.month__select:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 2px;
+}
+
+.month__chevron {
+  position: absolute;
+  right: 1.4em;
+  pointer-events: none;
+}
+
+/* ---------- search ---------- */
+
+.search {
+  position: relative;
+  max-width: 730px;
+  margin-top: clamp(24px, 5vh, 52px);
+  border-bottom: 1.5px solid var(--color-ink);
+}
+
+.search__input {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  caret-color: var(--color-brand-red);
+  font: inherit;
+  font-size: clamp(24px, 2.4vw, 38px);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  padding: 6px 48px 10px 4px;
+  outline: none;
+}
+
+.search__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search:focus-within {
+  border-bottom-color: var(--color-brand-red);
+}
+
+.search__placeholder {
+  position: absolute;
+  inset: 0 48px 0 4px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-bottom: 4px;
+  font-size: clamp(24px, 2.4vw, 38px);
+  font-weight: 300;
+  color: var(--color-faint);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.search__placeholder-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: placeholder-in 0.35s var(--ease-out);
+}
+
+.search__clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.search__clear:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+}
+
+/* ---------- result ---------- */
+
+.result {
+  margin-top: clamp(20px, 4vh, 40px);
+}
+
+.result__count {
+  position: relative;
+  margin: 0;
+  padding-left: 0.12em;
+  color: var(--color-brand-red);
+  font-size: clamp(88px, 10vw, 156px);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.result__count-number {
+  display: inline-block;
+  transform: skewX(-8deg);
+  font-variant-numeric: tabular-nums;
+}
+
+.result__accent {
+  position: absolute;
+  left: -0.25em;
+  top: 0.05em;
+  width: 1.6em;
+  height: 0.95em;
+  pointer-events: none;
+}
+
+.result__name {
+  margin: 0.25em 0 0;
+  font-size: clamp(24px, 2.4vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.result__paid {
+  margin: 0.35em 0 0;
+  color: var(--color-brand-red);
+  font-size: clamp(28px, 2.8vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hand-drawn underline under "paid" (an SVG stroke, drawn with CSS). */
+.result__paid-word {
+  padding-bottom: 0.22em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10'%3E%3Cpath d='M2 7 Q 30 2 60 5 T 98 4' fill='none' stroke='%23e23744' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat left bottom / 100% 0.28em;
+}
+
+.result__details {
+  margin: clamp(16px, 3vh, 28px) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: clamp(10px, 1.8vh, 16px);
+  color: var(--color-muted);
+  font-size: clamp(15px, 1.2vw, 19px);
+}
+
+.result__details li {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.result__details svg {
+  flex: none;
+  color: var(--color-brand-red);
+}
+
+.result__details strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.result__empty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: clamp(16px, 1.3vw, 20px);
+}
+
+/* ---------- plate ---------- */
+
+.plate {
+  margin: 0;
+  width: min(100%, 560px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.plate__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Temporary plate shape used only while final plated artwork is missing. */
+.plate__dish {
+  width: 92%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 50%, #fffdf8 0 58%, #f1e9dc 59% 66%, #fffaf2 67% 100%);
+  border: 2px solid #dccdb5;
+}
+
+.plate__item {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
+}
+
+/* ---------- reveal (search result + plate) ---------- */
+
+.reveal {
+  animation: reveal-up 0.4s var(--ease-out) both;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes placeholder-in {
+  from {
+    opacity: 0;
+    transform: translateY(40%);
+  }
+}
+
+/* ---------- footer food pile ---------- */
+
+.food-pile {
+  position: relative;
+  flex: none;
+  height: var(--pile-height);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* While items fall the canvas extends upwards over the (still hidden) page; once settled it is
+   exactly the footer's height. It never takes part in layout, so it causes no shifts or scroll. */
+.food-pile__canvas {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- smaller screens ---------- */
+
+@media (max-width: 760px) {
+  .app__content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app__right:empty {
+    display: none;
+  }
+
+  .plate {
+    width: min(80vw, 380px);
+    justify-self: center;
+  }
+}
+
+/* ---------- reduced motion: no movement, content simply appears ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .app__content,
+  .app--ready .app__content {
+    transform: none;
+    transition: none;
+  }
+
+  .reveal,
+  .search__placeholder-text {
+    animation: none;
+  }
 }

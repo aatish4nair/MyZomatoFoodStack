@@ -7,7 +7,9 @@
 - What was copied, unmodified:
   - 27 food/object illustrations → `frontend/src/assets/food/*.png` (384×384 transparent PNG)
   - Illustration style guide → `docs/design/upstream-sprite-style-guide.txt`
-- What is planned (Phase 1): adapting the physics/drop/outline logic from `app.js` into TypeScript.
+- Adapted into TypeScript (Phase 1): the sprite crop and convex-outline tracing
+  (`frontend/src/features/food-stack/sprite-shape.ts`) and the drop-and-settle approach
+  (`pile-simulation.ts`). These are covered by the MIT notice below.
 
 ```
 MIT License
@@ -33,11 +35,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Matter.js (planned, Phase 1)
+## Matter.js
 
-The original project bundles `matter-js` 0.20.0 (MIT, © Liam Brummitt). It is **not installed
-yet**. When the animation is built it will be installed from npm (`matter-js@0.20.0`), and its
+`matter-js` 0.20.0 (MIT, © Liam Brummitt), installed from npm as a frontend dependency. Its
 license ships inside the package.
+
+## Outfit font
+
+`@fontsource-variable/outfit` 5.3.0: the Outfit typeface (© The Outfit Project Authors), licensed
+under the SIL Open Font License 1.1. The license ships inside the package. The font files are
+bundled and self-hosted.
 
 ## npm dependencies
 

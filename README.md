@@ -4,9 +4,10 @@ A personal web app that turns my Zomato order history into a playful, searchable
 illustrations. Type a food, pick a month, and see how many times you ordered it, what you paid,
 where from and when.
 
-> **Status: Phase 0 (foundation).** The repository structure, tooling, security baseline, CI and
-> documentation are in place. The real page, the food-pile animation and the Google Sheets
-> integration are **not built yet**. See [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
+> **Status: Phase 1 (frontend and animation), awaiting review.** The page, the falling food pile,
+> the search with its animated placeholder, and the result/plate reveal are built. They run on
+> **synthetic demo data** with **temporary placeholder artwork**. The Google Sheets integration
+> (Phase 2) is **not built yet**. See [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
 
 The food illustrations and physics approach come from
 [My Food Pile](https://github.com/sumitbedi/my-food-pile) by Sumit Bedi (MIT). See

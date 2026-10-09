@@ -52,15 +52,45 @@ created when they get real code, not before.
 
 ```
 frontend/src/
-├── main.tsx         entry point
-├── app/App.tsx      placeholder shell (title only)
-├── assets/food/     27 illustrations from My Food Pile (not yet used)
-├── styles/          global CSS + design tokens
-└── test/            test setup
+├── main.tsx                     entry point (loads the self-hosted Outfit font)
+├── app/App.tsx                  page composition: data → month/search state → result, plate, pile
+├── components/MonthSelect.tsx   month pill (a native <select>)
+├── features/
+│   ├── food-art/registry.ts     the ONLY map from food category → image file (pile + plate)
+│   ├── food-stack/              the falling pile
+│   │   ├── pile-layout.ts         pure sizing/selection maths (responsive item size + count)
+│   │   ├── sprite-shape.ts        crop + convex outline tracing of each picture
+│   │   ├── pile-simulation.ts     Matter.js world: walls, bodies, stepping, settling, final layout
+│   │   ├── pile-renderer.ts       draws positions onto the canvas (no shadows or effects)
+│   │   ├── usePileAnimation.ts    React lifecycle: run once → freeze → clean up
+│   │   └── FoodPile.tsx           the footer element + canvas
+│   └── search/                  SearchField, useRotatingPlaceholder, SearchResult, Plate, icons, format
+├── hooks/                       useOrders (loading/failure), usePrefersReducedMotion
+├── services/                    OrderSource interface + synthetic demo data (Phase 1 only)
+├── assets/food/                 My Food Pile stand-in sprites (13 are bundled)
+├── assets/pile/, assets/plates/ final artwork goes here (see docs/design/ART-BRIEF.md)
+└── styles/global.css            design tokens, layout, reveal animations, reduced motion
 ```
 
-Planned (Phase 1): `features/food-stack/` (physics pile), `features/search/` (animated placeholder,
-search field, result), `services/` (API client), `hooks/`, `components/`.
+Search and matching are pure functions in `shared/src/lib/` (`food-search.ts`,
+`food-category.ts`), so the backend can reuse them in Phase 2.
+
+### How the opening animation works
+
+1. Orders load first, then the pile starts, so the drop runs exactly once.
+2. `FoodPile` reserves a fixed-height footer zone (`--pile-height`) at the bottom of the page. The
+   UI above it is hidden and `inert` until the pile reports "settled".
+3. The pile measures its zone, picks an item size (~5.5% of the width, 40–92 px) and enough items
+   to fill the zone. It loads and outlines the pictures, then builds a Matter.js world with a floor
+   and side walls.
+4. While falling, the canvas extends upwards over the hidden page. One `requestAnimationFrame` loop
+   steps the physics in fixed 1/60 s steps.
+5. Once every body is asleep (or after at most 7 simulated seconds), the final positions are kept
+   and items that stick up above the zone are dropped. The physics engine is destroyed, the canvas
+   shrinks to the zone, and a single static frame is drawn. **No loop runs after that.**
+6. The UI then fades and slides in (0.5 s). With reduced motion, a hidden tab, or after a window
+   resize, the pile is computed instantly without animating. A 9-second failsafe reveals the UI
+   even if images never load.
 
 ## 3. Data flow
 

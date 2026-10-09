@@ -27,8 +27,9 @@ screenshots side by side.
   field has text.
 - **Count:** very large (~150 px) red, heavy italic/brush-style numeral, with small hand-drawn red
   "emphasis" strokes on both sides.
-- **Food name:** bold, near-black (~38 px). Shows the **original** item name, brackets included
-  (e.g. "Tandoori Chicken (breast Pcs)").
+- **Food name:** bold, near-black (~38 px). Bracketed text is **removed** for display
+  ("Tandoori Chicken (breast Pcs)" shows as "Tandoori Chicken"; owner instruction, Phase 1). The
+  original name is still used for matching and kept unchanged in the data.
 - **Amount:** "₹366.04 paid" in bold red (~44 px), always with two decimals. A hand-drawn red
   underline sits under "paid".
 - **Detail lines** (~19 px, grey text, red outline icons, ~44 px apart):
@@ -42,17 +43,21 @@ screenshots side by side.
 
 ## States
 
-| State                  | Left column                         | Right side                          |
-| ---------------------- | ----------------------------------- | ----------------------------------- |
-| Loading / opening drop | Hidden until the drop has settled   | Empty                               |
-| No search              | Search with animated placeholder    | **Empty**                           |
-| Search with matches    | Count, name, amount, details        | One plate                           |
-| Search with no matches | To be decided in Phase 1 (e.g. "0") | **Empty**, never an unrelated plate |
+| State                  | Left column                                   | Right side                          |
+| ---------------------- | --------------------------------------------- | ----------------------------------- |
+| Loading / opening drop | Hidden until the drop has settled             | Empty                               |
+| No search              | Search with animated placeholder              | **Empty**                           |
+| Search with matches    | Count, name, amount, details                  | One plate                           |
+| Search with no matches | One quiet line: No orders for “…” in {Month}. | **Empty**, never an unrelated plate |
 
-## Open questions for Phase 1
+## Decisions made in Phase 1
 
-- Exact font (candidates to self-host: a heavy rounded geometric sans such as Outfit, Plus Jakarta
-  Sans or Satoshi). To be confirmed against the image.
-- Which matching line provides the food name, restaurant and date when several orders match (for
-  example, the most recent order).
-- Mobile layout (the image shows desktop only).
+- **Font:** Outfit (variable, SIL OFL), self-hosted via `@fontsource-variable/outfit`.
+- **Several matching orders:** the **most recent** matching line supplies the food name, restaurant
+  and date. The count is the number of distinct orders; amount and quantity are totals for the
+  selected month.
+- **Month selector:** defaults to the latest month that has orders; "All months" is the last option.
+- **Matching:** every typed word must match the start of a word in the item name, in any order
+  ("chicken tandoori" finds "Tandoori Chicken"; "lassi" does not find "Classic").
+- **Mobile (≤ 760 px):** a single column; the plate sits below the result details; the pile stays
+  at the bottom of the page.

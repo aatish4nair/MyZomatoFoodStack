@@ -39,6 +39,29 @@ one origin and no CORS changes are needed locally.
 Production-style run: `npm run build`, then `npm start -w @food-stack/backend` and
 `npm run preview -w @food-stack/frontend`.
 
+## Reviewing the animation (Phase 1)
+
+```bash
+npm run dev:frontend          # http://127.0.0.1:5173
+```
+
+- **Opening drop:** refresh the page. Food falls, settles along the bottom, then the interface
+  fades in.
+- **Placeholder:** leave the search empty and unfocused; a food name changes every second. Click
+  into the field and it pauses.
+- **Search:** try `tandoori`, `chicken tandoori`, `idly`, `momos`, `pizza`, then switch months.
+  `sushi` shows the no-match state.
+- **Reduced motion:** turn on macOS _System Settings → Accessibility → Display → Reduce motion_
+  (or Chrome DevTools → Rendering → _prefers-reduced-motion: reduce_) and refresh. The pile
+  appears already settled and the placeholder stays still.
+- **Responsive:** resize the window or use DevTools device mode. The pile re-settles to the new
+  width.
+- **Production build:** `npm run build && npm run preview -w @food-stack/frontend`
+  (http://127.0.0.1:4173). This includes the strict CSP.
+
+The data is **synthetic** (`frontend/src/services/demo-orders.ts`), and the pictures are
+temporary stand-ins until the final artwork is added (`docs/design/ART-BRIEF.md`).
+
 ## Commands
 
 | Command                            | Purpose                                               |

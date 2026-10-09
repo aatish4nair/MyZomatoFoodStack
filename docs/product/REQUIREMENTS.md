@@ -7,36 +7,35 @@ artwork.
 
 ## Page
 
-- [ ] Warm off-white background.
-- [ ] Header title **"My Zomato food Stack"**, with "Zomato" in red. _(Phase 0 placeholder shows
-      the title only.)_
-- [ ] Month selector beside the title.
-- [ ] Search field on the left with a thin underline.
-- [ ] Left column after a matching search: large **matching order count**, **food name**, **amount
+- [x] Warm off-white background.
+- [x] Header title **"My Zomato food Stack"**, with "Zomato" in red.
+- [x] Month selector beside the title.
+- [x] Search field on the left with a thin underline.
+- [x] Left column after a matching search: large **matching order count**, **food name**, **amount
       paid**, **restaurant**, **order date**, **quantity**.
-- [ ] Right side after a matching search: **exactly one** representative food plate, however many
+- [x] Right side after a matching search: **exactly one** representative food plate, however many
       orders match.
-- [ ] Right side with no active search: **empty**.
-- [ ] No matches: **never** show an unrelated food illustration.
-- [ ] Compact, colourful **footer collage** of food illustrations. Items are relatively small, and
+- [x] Right side with no active search: **empty**.
+- [x] No matches: **never** show an unrelated food illustration.
+- [x] Compact, colourful **footer collage** of food illustrations. Items are relatively small, and
       **no decorative effects emerge from the food**.
 
 ## Motion
 
-- [ ] On page load/refresh, illustrations fall from above, collide, bounce, and settle into the
+- [x] On page load/refresh, illustrations fall from above, collide, bounce, and settle into the
       footer pile (Matter.js physics, adapted from My Food Pile).
-- [ ] The interface appears **after** the opening animation.
+- [x] The interface appears **after** the opening animation.
 
 ## Search
 
-- [ ] An animated placeholder cycles through **real food names from the Google Sheet**, changing
-      every **1 second**.
-- [ ] Bracketed text never appears in placeholder suggestions. Use `toDisplayName()` from
+- [x] An animated placeholder cycles through **food names from the order data**, changing every
+      **1 second**. _(Synthetic demo data until the Google Sheet is connected in Phase 2.)_
+- [x] Bracketed text never appears in placeholder suggestions **or the result title**. Use `toDisplayName()` from
       `@food-stack/shared` (**built and tested in Phase 0**). The original item names are kept
       unchanged in the data.
-- [ ] The placeholder animation pauses when the user interacts with the field, and resumes when
-      the field is cleared.
-- [ ] Results update according to the selected month.
+- [x] The placeholder animation pauses while the field is focused or has text, and resumes once
+      it is empty and no longer focused. With reduced motion it shows a stable placeholder.
+- [x] Results update according to the selected month.
 
 ## Data
 
