@@ -1,0 +1,25 @@
+{
+  "name": "@food-stack/backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify API. The only component allowed to hold Google credentials or read order data.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --conditions=source --env-file-if-exists=.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.1",
+    "@fastify/helmet": "13.1.2",
+    "@fastify/rate-limit": "11.2.1",
+    "@food-stack/shared": "0.0.0",
+    "fastify": "5.12.5",
+    "fastify-type-provider-zod": "7.0.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

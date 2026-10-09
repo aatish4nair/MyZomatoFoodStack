@@ -1,0 +1,21 @@
+{
+  "name": "@food-stack/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contracts (types + runtime schemas) shared by the frontend and backend.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

@@ -1,0 +1,35 @@
+/* Design tokens. Exact values will be matched to the approved design in Phase 1. */
+:root {
+  --color-background: #faf6ef; /* warm off-white */
+  --color-ink: #1c1c1c;
+  --color-brand-red: #e23744;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-background);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.app {
+  padding: 2rem;
+}
+
+.app__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.app__brand {
+  color: var(--color-brand-red);
+}

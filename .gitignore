@@ -1,0 +1,35 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Test artefacts (Playwright, later)
+playwright-report/
+test-results/
+
+# Environment files: only the example is committed
+.env
+.env.*
+!.env.example
+
+# Credentials: never commit these (keep them outside the repo where possible)
+*.pem
+*.key
+*.p12
+*service-account*.json
+credentials*.json
+client_secret*.json
+token*.json
+
+# Private order data exports
+*.csv
+private/
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,41 @@
+{
+  "name": "my-zomato-food-stack",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A personal web app that turns Zomato order history into a searchable, animated food pile.",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.9.0"
+  },
+  "scripts": {
+    "dev:backend": "npm run dev -w @food-stack/backend",
+    "dev:frontend": "npm run dev -w @food-stack/frontend",
+    "build": "npm run build -w @food-stack/shared && npm run build -w @food-stack/backend && npm run build -w @food-stack/frontend",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "audit:deps": "npm audit --audit-level=high",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.1",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}
