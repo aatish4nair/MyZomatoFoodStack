@@ -4,10 +4,11 @@ A personal web app that turns my Zomato order history into a playful, searchable
 illustrations. Type a food, pick a month, and see how many times you ordered it, what you paid,
 where from and when.
 
-> **Status: Phase 1 (frontend and animation), awaiting review.** The page, the falling food pile,
-> the search with its animated placeholder, and the result/plate reveal are built. They run on
-> **synthetic demo data** with **temporary placeholder artwork**. The Google Sheets integration
-> (Phase 2) is **not built yet**. See [docs/product/REQUIREMENTS.md](docs/product/REQUIREMENTS.md).
+> **Status: Phase 2 (Google Sheets data), awaiting review.** The page, animation and search
+> (Phase 1) now read **real orders** from the backend, which reads the Google Sheet with a read-only
+> service account. The app is **local-only** (it refuses to run on a public address) and uses
+> **temporary placeholder artwork**. Connect your sheet with
+> [docs/development/GOOGLE-SHEETS-SETUP.md](docs/development/GOOGLE-SHEETS-SETUP.md).
 
 The food illustrations and physics approach come from
 [My Food Pile](https://github.com/sumitbedi/my-food-pile) by Sumit Bedi (MIT). See
@@ -51,6 +52,10 @@ Run the backend and frontend in **two terminals**:
 npm run dev:backend    # API on http://127.0.0.1:3000  (try /api/health)
 npm run dev:frontend   # UI  on http://127.0.0.1:5173  (forwards /api to the backend)
 ```
+
+- `npm run sheet:check`: tests the Google Sheets connection and prints the sheet's structure (no
+  personal data).
+- `npm run dev:demo`: frontend only, with synthetic demo orders (no backend or Google needed).
 
 ## Checks and tests
 

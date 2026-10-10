@@ -46,6 +46,12 @@ license ships inside the package.
 under the SIL Open Font License 1.1. The license ships inside the package. The font files are
 bundled and self-hosted.
 
+## google-auth-library
+
+`google-auth-library` 11.2.0 (© Google LLC), licensed under the Apache License 2.0. It is a backend
+runtime dependency, used only to obtain read-only Google Sheets access tokens. The license ships
+inside the package.
+
 ## npm dependencies
 
 All other dependencies are installed from npm and listed in `package-lock.json`; each package

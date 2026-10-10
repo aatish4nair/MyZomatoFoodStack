@@ -9,44 +9,46 @@ Status markers: **[built]** exists and is tested · **[planned]** designed here,
  │  Gmail ──▶ Apps Script (existing, unchanged) ──▶ Sheet │
  │                          "My Zomato Food Pile" / "Formatted Data"
  └──────────────────────────────┬─────────────────────────┘
-                                │ Google Sheets API, read-only, service account   [planned]
+                                │ Google Sheets API, read-only, service account   [built]
                 ════════════════╪═══════════ trust boundary: server side ═══════════
                                 ▼
-                      backend/ (Fastify, Node)                                    [built: shell]
+                      backend/ (Fastify, Node, bound to localhost)        [built]
                       validates, filters, aggregates
                                 │ HTTPS JSON under /api, validated by shared schemas
                 ════════════════╪═══════════ trust boundary: the internet/browser ══
                                 ▼
-                      frontend/ (React, static files in the browser)              [built: shell]
+                      frontend/ (React, static files in the browser)      [built]
 ```
 
 - The **browser is untrusted**. It never receives Google credentials, the spreadsheet ID, Gmail
-  message IDs, or the full dataset by default.
+  message IDs or sheet row numbers. It does receive the validated orders it needs to search
+  (from `/api/orders`), which is why the API is local-only (see the security model).
 - The **backend is the only component that talks to Google**.
 - The existing **Apps Script import stays exactly as it is**. This project only reads the sheet.
 
 ## 2. Module responsibilities
 
-| Module      | Responsibility                                                                                                                                            | Must not                                          |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `shared/`   | Zod schemas + inferred TypeScript types (`OrderLine`, `MonthFilter`, `SearchSummary`, `HealthResponse`, `ApiError`), pure helpers such as `toDisplayName` | Import from `frontend` or `backend`; do I/O       |
-| `backend/`  | Config validation, HTTP security (headers, CORS, rate limit), error handling, API routes, Google Sheets integration                                       | Import from `frontend`; log personal data         |
-| `frontend/` | Rendering, animation, user interaction; calls the API over HTTP                                                                                           | Import from `backend`; hold secrets or data files |
+| Module      | Responsibility                                                                                                                                                                                      | Must not                                          |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `shared/`   | Zod schemas + inferred types (`Order`, `OrderItem`, `MonthFilter`, `OrdersResponse`, `Insights`, `SearchSummary`, `ApiError`), pure helpers (`toDisplayName`, search, status policy, paise parsing) | Import from `frontend` or `backend`; do I/O       |
+| `backend/`  | Config validation, HTTP security (headers, CORS, rate limit), error handling, API routes, Google Sheets integration                                                                                 | Import from `frontend`; log personal data         |
+| `frontend/` | Rendering, animation, user interaction; calls the API over HTTP                                                                                                                                     | Import from `backend`; hold secrets or data files |
 
 ### Backend layout (current)
 
 ```
 backend/src/
-├── server.ts                 starts the process (reads env, listens, graceful shutdown)
-├── app.ts                    buildApp(env): registers plugins and routes; used by tests
-├── config/env.ts             Zod-validated environment variables
-├── lib/logger.ts             logging rules (method + path only, redaction)
-├── middleware/error-handler  uniform, safe JSON errors
-└── modules/health/           GET /api/health
+├── server.ts                          starts the process (reads env, listens, graceful shutdown)
+├── app.ts                             buildApp(env, deps): plugins, guards, routes; used by tests
+├── config/env.ts                      Zod-validated environment (incl. loopback-only HOST, Google settings)
+├── integrations/google-sheets/        the ONLY code that talks to Google (read-only values.get)
+├── lib/                               logger rules, safe data-error codes and messages
+├── middleware/                        error handler, local-only guard (Host + Sec-Fetch-Site, no-store)
+├── modules/health/                    GET /api/health
+├── modules/orders/                    sheet cell parsers, sheet → orders parser, cached repository, GET /api/orders
+├── modules/insights/                  the four metrics, GET /api/insights
+└── scripts/check-sheet.ts             `npm run sheet:check`: structure-only diagnostics
 ```
-
-Planned additions: `modules/orders/`, `modules/insights/`, `integrations/google-sheets/`. They're
-created when they get real code, not before.
 
 ### Frontend layout (current)
 
@@ -94,53 +96,64 @@ Search and matching are pure functions in `shared/src/lib/` (`food-search.ts`,
 
 ## 3. Data flow
 
-1. **[existing]** Apps Script imports Zomato order emails from Gmail into the "Formatted Data" tab.
-   Columns: S. No., Order ID, Order Date, Order Time, Restaurant, Item Name, Quantity, Total Paid,
-   Order Status, Gmail Message ID.
-2. **[planned]** The backend reads the tab with read-only Sheets API scope, validates each row with
-   a Zod schema, and maps it to `OrderLine`. It drops `S. No.` and `Gmail Message ID`. Rows that
-   fail validation are counted and skipped, never logged in full.
-3. **[planned]** The backend caches the parsed rows in memory for a short time (minutes) to avoid
-   hitting Sheets API quotas. There is no database.
-4. **[planned]** The frontend requests only what the page needs (for example a summary for a
-   query and month), validates the response with the same shared schema, and renders it.
-
-Open data questions for Phase 2: whether "Total Paid" is per item line or per order (repeated on
-each line), the sheet's date/time formats, and which order statuses to exclude (e.g. cancelled).
+1. **[existing, unchanged]** Apps Script imports Zomato order emails from Gmail into the
+   "Formatted Data" tab.
+2. **[built]** On request, the backend's repository returns a cached snapshot, or reads the tab
+   with `spreadsheets.values.get` (read-only scope, unformatted values, 10 s timeout).
+3. **[built]** `parse-sheet.ts` finds columns by header, validates every row, groups rows by Order
+   ID into `Order`s, and drops `S. No.` and `Gmail Message ID`. Rules: [DATA-MAPPING.md](DATA-MAPPING.md).
+4. **[built]** The snapshot is cached in memory for `SHEET_CACHE_TTL_SECONDS` (default 60).
+   Concurrent requests share one read. If a refresh fails, the last good snapshot is served with
+   `freshness.stale: true`; with none, a safe error code is returned, and Google isn't retried for
+   5 s. There is no database.
+5. **[built]** The frontend's `apiOrderSource` fetches `/api/orders?month=all` once, validates it
+   with the shared schema, and the page searches it locally (month filter, matching, placeholder).
+   Demo data is used only in `npm run dev:demo` and tests; it isn't in production builds, and
+   there is no fallback to it.
 
 ## 4. API boundary
 
-| Method | Path          | Status        | Response                                       |
-| ------ | ------------- | ------------- | ---------------------------------------------- |
-| GET    | `/api/health` | **[built]**   | `HealthResponse` → `{"status":"ok"}`           |
-| GET    | `/api/...`    | **[planned]** | Order/insight endpoints, designed in Phase 1/2 |
+| Method | Path                               | Response                                                                   |
+| ------ | ---------------------------------- | -------------------------------------------------------------------------- |
+| GET    | `/api/health`                      | `HealthResponse` → `{"status":"ok"}` (no configuration details)            |
+| GET    | `/api/orders?month=all\|YYYY-MM`   | `OrdersResponse`: `orders`, `quality` counts, `freshness`                  |
+| GET    | `/api/insights?month=all\|YYYY-MM` | `Insights`: the four metrics + `basis` + `freshness` (not shown in the UI) |
+
+Why these two data endpoints: the page needs every month (for the month pill and instant,
+offline-feeling search), so one `/api/orders` read serves it; a per-keystroke search endpoint would
+add requests without reducing what the browser receives. `/api/insights` exists for future use and
+keeps metric logic on the server.
 
 Rules for every endpoint:
 
-- Request and response schemas come from `shared/` and are enforced at runtime with
-  `fastify-type-provider-zod`. An invalid request returns a 400 that never echoes the input.
-- Errors always use the `ApiError` shape `{ statusCode, error, message }`. Server errors return a
-  generic message.
-- Routes live under `/api`. In development the Vite dev server forwards `/api` to the backend, so
-  the browser only ever talks to one origin.
-- **Endpoints that return order data need access control first** (see the security model).
+- Query and response schemas come from `shared/` and are enforced at runtime
+  (`fastify-type-provider-zod`). An invalid query returns 400 without echoing the input. Response
+  validation strips any field outside the contract.
+- Errors use `ApiError` `{ statusCode, error, message, code? }`. Data problems return **503** with a
+  safe `code` (`NOT_CONFIGURED`, `UPSTREAM_AUTH`, `UPSTREAM_NOT_FOUND`, `UPSTREAM_QUOTA`,
+  `UPSTREAM_TIMEOUT`, `UPSTREAM_ERROR`, `MALFORMED_SHEET`). Google's raw errors are never forwarded
+  or logged.
+- All `/api` responses send `Cache-Control: no-store`.
+- Local-only guard: Host must be localhost, and cross-site browser requests are refused (see the
+  security model §5).
 
-## 5. Google Sheets integration design [planned, Phase 2]
+## 5. Google Sheets integration [built]
 
-- **Auth:** a Google Cloud **service account** with the Sheets API enabled. The sheet is shared
-  with the service account's email as **Viewer** (read-only). Scope:
-  `https://www.googleapis.com/auth/spreadsheets.readonly`.
-- **Credentials:** a JSON key file stored **outside the repository**. Its path is given to the
-  backend through `GOOGLE_APPLICATION_CREDENTIALS`, or the hosting platform injects it as a secret.
-  Where the hosting platform supports it, keyless workload identity is preferred over a key file.
-- **Config:** `GOOGLE_SHEETS_SPREADSHEET_ID` and `GOOGLE_SHEETS_RANGE` (e.g. `Formatted Data!A:J`).
-  These are already listed in `backend/.env.example` but are not read by the code yet.
-- **Boundary:** a single module `backend/src/integrations/google-sheets/` exposes something like
-  `fetchOrderRows(): Promise<OrderLine[]>`. Nothing else in the backend imports Google libraries.
-  Tests replace this module with a fake that returns synthetic rows. Real order data never goes
-  into test fixtures.
-- **No public exports:** the sheet is never "published to the web", and no CSV/JSON copy of the
-  data is placed in `frontend/public` or the repository.
+- **Library:** `google-auth-library` (official, Apache-2.0) obtains an access token for a
+  **service account**; one `fetch` calls `GET https://sheets.googleapis.com/v4/spreadsheets/{id}/values/{range}`
+  (see [ADR-0002](ADR-0002-phase-2-data-access.md)).
+- **Scope:** `https://www.googleapis.com/auth/spreadsheets.readonly` only. The sheet is shared with
+  the service account as **Viewer**.
+- **Configuration** (`backend/.env`): `GOOGLE_SHEET_ID`, `GOOGLE_SHEET_RANGE` (default
+  `'Formatted Data'!A:J`), and exactly one of `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` (recommended: an
+  absolute path outside the repo) or `GOOGLE_SERVICE_ACCOUNT_JSON`. Without `GOOGLE_SHEET_ID` the API
+  runs and reports `NOT_CONFIGURED`; a half-configured `.env` stops startup with a message naming
+  the variable.
+- **Boundary:** `SheetValuesReader.readValues(): Promise<unknown[][]>` is all the rest of the
+  backend sees. Tests inject fakes; no test touches Google.
+- **No public exports:** the sheet is never published, and no copy of the data is stored in the
+  repository or `frontend/public`.
+- **Setup guide:** [docs/development/GOOGLE-SHEETS-SETUP.md](../development/GOOGLE-SHEETS-SETUP.md).
 
 ## 6. Dependency rules
 

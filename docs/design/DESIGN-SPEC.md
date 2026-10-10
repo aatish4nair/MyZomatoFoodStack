@@ -25,30 +25,34 @@ screenshots side by side.
 - **Search input:** large, light-weight text (~36 px), near-black. Red caret. 1–2 px dark
   underline across the full field width. A thin × clear button at the right end, shown when the
   field has text.
-- **Count:** very large (~150 px) red, heavy italic/brush-style numeral, with small hand-drawn red
-  "emphasis" strokes on both sides.
+- **Count:** very large (~150 px) red, bold (800), **upright** numeral (owner instruction: never
+  italic or slanted), with small hand-drawn red "emphasis" strokes attached to each side.
+  It is aligned with the food name below; on mobile it shifts right so the left strokes fit.
 - **Food name:** bold, near-black (~38 px). Bracketed text is **removed** for display
   ("Tandoori Chicken (breast Pcs)" shows as "Tandoori Chicken"; owner instruction, Phase 1). The
   original name is still used for matching and kept unchanged in the data.
-- **Amount:** "₹366.04 paid" in bold red (~44 px), always with two decimals. A hand-drawn red
-  underline sits under "paid".
+- **Amount:** "₹366 paid" in bold red (~44 px), in **whole rupees** (owner instruction). The exact
+  paise total is rounded half up for display only (₹1,985.49 → ₹1,985; ₹1,985.50 → ₹1,986). A
+  hand-drawn red underline sits under "paid".
 - **Detail lines** (~19 px, grey text, red outline icons, ~44 px apart):
   1. pizza-slice icon: "From **{restaurant}**." (restaurant name in bold)
   2. clock icon: "Ordered on {d MMMM yyyy}."
   3. calendar icon: "Quantity: {n} ({k} order(s) this month)."
-- **Plate:** one realistic, illustrated plated dish on a white/cream plate with garnish, with a soft
-  natural shadow under the plate only. No steam, sparkles or other effects.
+- **Plate:** one **photorealistic** plated dish that looks like the searched dish, on a white/cream
+  plate with garnish, with a soft shadow under the plate only. No steam, sparkles or other effects.
+  Without suitable artwork, a neutral empty plate is shown (see ART-BRIEF.md).
 - **Footer pile:** many small food items, overlapping, colourful, all in the same illustrated style
   as the plate. Drinks with straws are fine.
 
 ## States
 
-| State                  | Left column                                   | Right side                          |
-| ---------------------- | --------------------------------------------- | ----------------------------------- |
-| Loading / opening drop | Hidden until the drop has settled             | Empty                               |
-| No search              | Search with animated placeholder              | **Empty**                           |
-| Search with matches    | Count, name, amount, details                  | One plate                           |
-| Search with no matches | One quiet line: No orders for “…” in {Month}. | **Empty**, never an unrelated plate |
+| State                              | Left column                                                        | Right side                             |
+| ---------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
+| Loading / opening drop             | Hidden until the drop has settled                                  | Empty                                  |
+| No search                          | Search with animated placeholder                                   | **Empty**                              |
+| Generic query, several foods match | “Which biryani are you looking for?” + one button per real variant | **Empty** (a question is not a result) |
+| Search with matches                | Count, name, amount, details                                       | One plate (or a neutral empty plate)   |
+| Search with no matches             | One quiet line: No orders for “…” in {Month}.                      | **Empty**, never an unrelated plate    |
 
 ## Decisions made in Phase 1
 
@@ -59,5 +63,10 @@ screenshots side by side.
 - **Month selector:** defaults to the latest month that has orders; "All months" is the last option.
 - **Matching:** every typed word must match the start of a word in the item name, in any order
   ("chicken tandoori" finds "Tandoori Chicken"; "lassi" does not find "Classic").
+- **Variants (Phase 2 refinement):** a food is a distinct display name ("Chicken Biryani (Serves 1)"
+  ≡ "Chicken Biryani"). If the typed words exactly name one food (any order), or only one food
+  matches, the result is shown directly. Otherwise the question lists up to 8 variants from the
+  selected month, most-ordered first, with "N more matches. Keep typing…" for the rest. Picking a
+  variant fills the search field with its name and returns focus there.
 - **Mobile (≤ 760 px):** a single column; the plate sits below the result details; the pile stays
   at the bottom of the page.

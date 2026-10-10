@@ -1,65 +1,94 @@
 # Artwork brief (owner-supplied art)
 
-**Decision (2026-10-09):** the owner will supply new artwork that matches `approved-design.png`.
-The 27 My Food Pile sprites in `frontend/src/assets/food/` are a different style ("glossy toy"),
-so they'll be used only as temporary placeholders while building and will be replaced.
+**Direction (updated 2026-10-10):** **photorealistic food**: appetising food photography or
+photorealistic renders of a real plated dish, with warm lighting, suited to the cream page. The dish
+must look like **that dish**, not merely the same broad category (tandoori chicken is red-orange
+and charred; Afghani chicken is creamy and pale; veg biryani has no chicken on top).
+
+**Interim plate art:** `plates/tandoori-chicken.png` is cropped (plate only, 600×600) from the
+owner's approved design image `docs/design/approved-design.png`, with the owner's approval. Replace it
+with a higher-resolution file of the same name whenever available. No other final artwork exists yet.
+The 16 My Food Pile images bundled from
+`frontend/src/assets/food/` are **temporary, toy-style stand-ins**, used only where they show the
+same dish.
 
 ## Two kinds of image
 
-| Kind          | Used for                                    | Size                      | Folder (Phase 1)              |
-| ------------- | ------------------------------------------- | ------------------------- | ----------------------------- |
-| **Pile item** | The falling footer collage                  | 512×512 transparent PNG   | `frontend/src/assets/pile/`   |
-| **Plate**     | The single dish on the right after a search | 1024×1024 transparent PNG | `frontend/src/assets/plates/` |
+| Kind          | Used for                                    | Size                      | Folder                                 |
+| ------------- | ------------------------------------------- | ------------------------- | -------------------------------------- |
+| **Plate**     | The single dish on the right after a search | 1024×1024 transparent PNG | `frontend/src/assets/plates/<key>.png` |
+| **Pile item** | The falling footer collage                  | 512×512 transparent PNG   | `frontend/src/assets/pile/<key>.png`   |
 
-File names: lowercase, hyphenated, the same name for both kinds, e.g. `pile/biryani.png` and
-`plates/biryani.png`.
+Files are picked up by name on the next build (or immediately in `npm run dev:frontend`). No code
+changes are needed.
 
 ## Rules for every image
 
-1. Transparent background. No floor, no table and no background colour.
-2. Same illustrated, realistic, warm style as the plate and footer in `approved-design.png`.
-3. One subject, centred, fully visible (not cropped).
-4. **No steam, smoke, sparkles, motion lines or anything coming off the food.**
-5. No text, logos or brand names.
-6. Pile items must still read clearly at about 60–90 px on screen, so use bold shapes and clear
-   colours.
-7. Plates: a three-quarter top-down view of a round cream/white plate with garnish, like the
-   tandoori chicken example. A soft shadow under the plate is fine; nothing else.
+1. Transparent background (cut out); no table, floor or background colour.
+2. **Plates:** a three-quarter top-down view of one round cream/white plate or bowl with the dish and
+   light garnish (e.g. tandoori chicken with green chutney, onion rings, lemon). A soft shadow under
+   the plate only.
+3. **No steam, smoke, sparkles, motion lines or anything coming off the food.**
+4. No text, logos, brand names or watermarks; use only images you have the right to use.
+5. Pile items: a single item, clearly readable at about 60–90 px.
+6. Keep the plate within about **90% of the frame**: the outer edge of plate images is softly faded
+   into the page.
 
-## Required files (exact names)
+## Art keys and fallbacks
 
-The app recognises exactly these category names. They're defined in
-`shared/src/lib/food-category.ts`, which also holds the rules that decide which category an
-order's item name belongs to. Drop `assets/pile/<name>.png` and/or `assets/plates/<name>.png` and
-they replace the stand-in on the next build; no code changes are needed.
+Defined in `shared/src/lib/food-category.ts` (first matching rule wins). The app looks for, in order:
 
-| Name               | Example item names it covers                     | Temporary stand-in today |
-| ------------------ | ------------------------------------------------ | ------------------------ |
-| `tandoori-chicken` | Tandoori Chicken, Paneer Tikka, Seekh Kebab      | `fried-chicken.png`      |
-| `fried-chicken`    | Fried Chicken, Wings, Drumsticks                 | `fried-chicken.png`      |
-| `curry`            | Butter Chicken, Dal Makhani, Chole, Tikka Masala | none                     |
-| `biryani`          | Biryani, Pulao, Fried Rice                       | `biryani.png`            |
-| `noodles`          | Hakka Noodles, Chow Mein, Ramen                  | none                     |
-| `momos`            | Momos, Dumplings, Dim Sum                        | none                     |
-| `dosa-idli`        | Masala Dosa, Idly, Uttapam, Vada                 | `dosa.png`               |
-| `pizza`            | Margherita, any "Pizza"                          | `pizza.png`              |
-| `burger`           | any "Burger"                                     | `burger.png`             |
-| `sandwich`         | Sandwich, Sub, Panini                            | `sandwich.png`           |
-| `wrap-roll`        | Shawarma, Kathi Roll, Wrap, Frankie              | `shawarma.png`           |
-| `samosa`           | Samosa, Kachori, Pakora                          | none                     |
-| `fries`            | any "Fries"                                      | `fries.png`              |
-| `cold-drink`       | Coke, Pepsi, Sprite, Thums Up, Mojito            | `coke.png`               |
-| `lassi-shake`      | Lassi, Shake, Smoothie, Cold Coffee              | `lassi.png`              |
-| `ice-cream`        | Ice Cream, Sundae, Kulfi                         | `ice-cream-cup.png`      |
-| `brownie-cake`     | Brownie, Cake, Pastry, Cheesecake                | `cake.png`               |
-| `donut`            | Donut, Doughnut                                  | none                     |
-| `sweets`           | Rasmalai, Gulab Jamun, Jalebi, Halwa             | `rasmalai.png`           |
+1. `plates/<key>.png`;
+2. a **category-level fallback** `plates/<parent>.png`, if the key has a parent;
+3. a stand-in that shows **exactly** this dish;
+4. otherwise, a **neutral empty plate**. It never shows an unrelated dish.
 
-- **Plates matter most.** Until `plates/<name>.png` exists, the right side draws the small stand-in
-  on a plain plate shape. Categories with no stand-in show **no plate at all**.
-- An item whose name matches no category is left out of the pile and shows no plate, so no
-  unrelated picture ever appears. A generic `takeaway` image is therefore **optional**. If you'd
-  like unmatched items to appear in the pile as a takeaway box, say so and it can be added as a
-  category.
-- If your real orders contain foods that fit none of these (seen once Phase 2 connects the sheet),
-  new categories can be added in one place.
+| Key                | Example item names                         | Fallback (parent)         | Stand-in today      |
+| ------------------ | ------------------------------------------ | ------------------------- | ------------------- |
+| `tandoori-chicken` | Tandoori Chicken, Chicken Tandoori, Tangdi | —                         | **interim plate ✓** |
+| `afghani-chicken`  | Afghani / Malai / Tandoori Malai Chicken   | `chicken-curry` → `curry` | none                |
+| `chicken-curry`    | Butter Chicken, Chicken Tikka Masala       | `curry`                   | none                |
+| `chicken-tikka`    | Chicken Tikka, Chicken Seekh Kebab         | `kebab`                   | none                |
+| `paneer-tikka`     | Paneer Tikka                               | `kebab`                   | none                |
+| `kebab`            | Mutton Seekh Kebab, other tikka/kebab      | —                         | none                |
+| `fried-chicken`    | Fried Chicken, Wings, Chicken 65           | —                         | `fried-chicken.png` |
+| `chicken-biryani`  | Chicken Dum Biryani                        | `biryani`                 | `biryani.png`       |
+| `mutton-biryani`   | Mutton Biryani                             | `biryani`                 | none                |
+| `egg-biryani`      | Egg Biryani                                | `biryani`                 | none                |
+| `veg-biryani`      | Veg / Paneer Biryani                       | `biryani`                 | none                |
+| `biryani`          | Hyderabadi Biryani, Pulao                  | —                         | none                |
+| `fried-rice`       | Fried Rice                                 | —                         | none                |
+| `paneer-curry`     | Paneer Butter Masala, Kadai Paneer         | `curry`                   | none                |
+| `dal`              | Dal Makhani, Dal Tadka                     | `curry`                   | none                |
+| `curry`            | Chole, Rajma, Korma, other curries         | —                         | none                |
+| `naan-roti`        | Butter Naan, Roti, Paratha                 | —                         | none                |
+| `idli`             | Idly                                       | —                         | `idli.png`          |
+| `dosa`             | Masala Dosa, Uttapam                       | —                         | `dosa.png`          |
+| `vada`             | Medu Vada                                  | —                         | `vada.png`          |
+| `momos`            | Momos, Dumplings                           | —                         | none                |
+| `samosa`           | Samosa, Kachori, Pakora                    | —                         | none                |
+| `pizza`            | any Pizza, Margherita                      | —                         | `pizza.png`         |
+| `garlic-bread`     | Garlic Bread(sticks)                       | —                         | `garlic-bread.png`  |
+| `burger`           | any Burger                                 | —                         | `burger.png`        |
+| `sandwich`         | Sandwich, Sub, Panini                      | —                         | `sandwich.png`      |
+| `wrap-roll`        | Shawarma, Kathi Roll, Wrap                 | —                         | `shawarma.png`      |
+| `noodles`          | Hakka Noodles, Chow Mein                   | —                         | none                |
+| `fries`            | Fries                                      | —                         | `fries.png`         |
+| `cold-drink`       | Coke, Pepsi, Sprite, Mojito                | —                         | `coke.png`          |
+| `lassi`            | Lassi                                      | —                         | `lassi.png`         |
+| `shake-coffee`     | Shakes, Cold Coffee                        | —                         | none                |
+| `ice-cream`        | Ice Cream, Sundae, Kulfi                   | —                         | `ice-cream-cup.png` |
+| `brownie-cake`     | Brownie, Cake, Pastry                      | —                         | `cake.png`          |
+| `donut`            | Donut                                      | —                         | none                |
+| `rasmalai`         | Rasmalai                                   | —                         | `rasmalai.png`      |
+| `sweets`           | Gulab Jamun, Jalebi, Halwa                 | —                         | none                |
+
+## What YOUR data needs
+
+Run `npm run art:coverage`. It writes `private/art-coverage.md` (Git-ignored; it contains your food
+names) listing every art key your orders use, which plate files are still needed, and the foods
+that match no key. **Prioritise the plates at the top of that list.** For foods with no key, tell
+Claude which picture they should use, and a key will be added in one place.
+
+Status on 2026-10-10: your data uses **24 keys**; `tandoori-chicken` now has interim plate art, so
+**23 plate images are still needed**, and 19 distinct foods match no key yet.

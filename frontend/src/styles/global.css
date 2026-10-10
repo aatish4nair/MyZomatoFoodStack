@@ -92,7 +92,7 @@ body {
 
 .app__title {
   margin: 0;
-  font-size: clamp(28px, 2.9vw, 46px);
+  font-size: clamp(24px, min(2.5vw, 4.6vh), 40px);
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.1;
@@ -137,7 +137,7 @@ body {
 .search {
   position: relative;
   max-width: 730px;
-  margin-top: clamp(24px, 5vh, 52px);
+  margin-top: clamp(16px, 3.6vh, 40px);
   border-bottom: 1.5px solid var(--color-ink);
 }
 
@@ -149,7 +149,7 @@ body {
   color: var(--color-ink);
   caret-color: var(--color-brand-red);
   font: inherit;
-  font-size: clamp(24px, 2.4vw, 38px);
+  font-size: clamp(20px, min(1.9vw, 3.6vh), 30px);
   font-weight: 300;
   letter-spacing: -0.01em;
   padding: 6px 48px 10px 4px;
@@ -171,7 +171,7 @@ body {
   align-items: center;
   overflow: hidden;
   padding-bottom: 4px;
-  font-size: clamp(24px, 2.4vw, 38px);
+  font-size: clamp(20px, min(1.9vw, 3.6vh), 30px);
   font-weight: 300;
   color: var(--color-faint);
   pointer-events: none;
@@ -207,48 +207,56 @@ body {
 /* ---------- result ---------- */
 
 .result {
-  margin-top: clamp(20px, 4vh, 40px);
+  margin-top: clamp(14px, 3vh, 32px);
 }
 
 .result__count {
-  position: relative;
   margin: 0;
-  padding-left: 0.12em;
   color: var(--color-brand-red);
-  font-size: clamp(88px, 10vw, 156px);
+  font-size: clamp(64px, min(7.2vw, 13vh), 120px);
   font-weight: 800;
-  font-style: italic;
+  font-style: normal; /* upright, never italic */
   line-height: 0.95;
   letter-spacing: -0.04em;
 }
 
 .result__count-number {
+  position: relative;
   display: inline-block;
-  transform: skewX(-8deg);
+  margin-left: -0.04em; /* optical alignment with the food name below */
   font-variant-numeric: tabular-nums;
 }
 
+/* Hand-drawn emphasis strokes, attached to each side of the number so they fit any width. */
 .result__accent {
   position: absolute;
-  left: -0.25em;
-  top: 0.05em;
-  width: 1.6em;
-  height: 0.95em;
+  top: 0.12em;
+  width: 0.34em;
+  height: 0.62em;
   pointer-events: none;
 }
 
+.result__accent--left {
+  right: calc(100% + 0.04em);
+}
+
+.result__accent--right {
+  left: calc(100% + 0.06em);
+}
+
 .result__name {
-  margin: 0.25em 0 0;
-  font-size: clamp(24px, 2.4vw, 38px);
+  margin: 0.3em 0 0;
+  font-size: clamp(20px, min(1.9vw, 3.6vh), 30px);
+  overflow-wrap: anywhere; /* long dish names wrap instead of running under the plate */
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
 
 .result__paid {
-  margin: 0.35em 0 0;
+  margin: 0.3em 0 0;
   color: var(--color-brand-red);
-  font-size: clamp(28px, 2.8vw, 44px);
+  font-size: clamp(22px, min(2.1vw, 4vh), 34px);
   font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -262,23 +270,25 @@ body {
 }
 
 .result__details {
-  margin: clamp(16px, 3vh, 28px) 0 0;
+  margin: clamp(12px, 2.4vh, 22px) 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: clamp(10px, 1.8vh, 16px);
+  gap: clamp(8px, 1.4vh, 12px);
   color: var(--color-muted);
-  font-size: clamp(15px, 1.2vw, 19px);
+  font-size: clamp(14px, min(1.05vw, 2.1vh), 17px);
 }
 
 .result__details li {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .result__details svg {
   flex: none;
+  width: 1.45em;
+  height: 1.45em;
   color: var(--color-brand-red);
 }
 
@@ -287,17 +297,77 @@ body {
   font-weight: 600;
 }
 
+.result__note {
+  color: var(--color-muted);
+  font-size: 0.4em;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.load-error {
+  margin-top: clamp(20px, 4vh, 40px);
+}
+
+.load-error,
 .result__empty {
   margin: 0;
   color: var(--color-muted);
   font-size: clamp(16px, 1.3vw, 20px);
 }
 
+/* ---------- clarification: "Which biryani are you looking for?" ---------- */
+
+.clarify__question {
+  margin: 0;
+  font-size: clamp(18px, 1.5vw, 24px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.clarify__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 730px;
+}
+
+.clarify__option {
+  min-height: 44px; /* comfortable touch target */
+  padding: 0.55em 1.2em;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  background: var(--color-pill);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: clamp(15px, 1.15vw, 18px);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.clarify__option:hover {
+  border-color: var(--color-brand-red);
+}
+
+.clarify__option:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 2px;
+}
+
+.clarify__more {
+  margin: 14px 0 0;
+  color: var(--color-muted);
+  font-size: clamp(14px, 1.1vw, 16px);
+}
+
 /* ---------- plate ---------- */
 
 .plate {
   margin: 0;
-  width: min(100%, 560px);
+  /* Prominent but capped by the viewport height, so it never pushes the footer collage down. */
+  width: min(100%, 520px, 56vh);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -307,6 +377,8 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  /* Softly fades the edges of photographic artwork into the cream page. */
+  mask-image: radial-gradient(closest-side, #000 93%, transparent 100%);
 }
 
 /* Temporary plate shape used only while final plated artwork is missing. */
@@ -320,13 +392,40 @@ body {
   border: 2px solid #dccdb5;
 }
 
+.plate--empty .plate__dish {
+  opacity: 0.85;
+}
+
 .plate__item {
   width: 62%;
   height: 62%;
   object-fit: contain;
 }
 
-/* ---------- reveal (search result + plate) ---------- */
+/* ---------- plate entrance: the plate stays still, the food settles in ---------- */
+
+.plate {
+  animation: plate-appear 0.25s ease-out both;
+}
+
+.plate__food {
+  animation: food-in 0.38s var(--ease-out) both;
+}
+
+@keyframes plate-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes food-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+}
+
+/* ---------- reveal (search result) ---------- */
 
 .reveal {
   animation: reveal-up 0.4s var(--ease-out) both;
@@ -378,8 +477,14 @@ body {
     display: none;
   }
 
+  /* The page gutter is narrower than the left emphasis strokes here, so make room for them. */
+  .result__count-number {
+    margin-left: 0.38em;
+  }
+
   .plate {
-    width: min(80vw, 380px);
+    /* Smaller on phones so the footer collage stays partly in view below a result. */
+    width: min(62vw, 250px);
     justify-self: center;
   }
 }
@@ -394,7 +499,9 @@ body {
   }
 
   .reveal,
-  .search__placeholder-text {
+  .search__placeholder-text,
+  .plate,
+  .plate__food {
     animation: none;
   }
 }

@@ -5,13 +5,13 @@ implemented. Nothing marked [planned] should be assumed to protect anything toda
 
 ## 1. Sensitive data
 
-| Data                                               | Sensitivity       | Where it may live                                                      |
-| -------------------------------------------------- | ----------------- | ---------------------------------------------------------------------- |
-| Google service-account key / any Google credential | **Secret**        | Outside the repo; injected into the backend process only               |
-| Spreadsheet ID                                     | Confidential      | Backend environment only                                               |
-| Order rows (items, restaurants, dates, amounts)    | **Personal**      | Google Sheet; backend memory; API responses to an authorised user      |
-| Gmail Message IDs, sheet row numbers               | Personal/internal | Sheet and backend only; dropped before the API (see `OrderLineSchema`) |
-| Food illustrations, UI code                        | Public            | Repository and frontend bundle                                         |
+| Data                                               | Sensitivity       | Where it may live                                                     |
+| -------------------------------------------------- | ----------------- | --------------------------------------------------------------------- |
+| Google service-account key / any Google credential | **Secret**        | Outside the repo; injected into the backend process only              |
+| Spreadsheet ID                                     | Confidential      | Backend environment only                                              |
+| Order rows (items, restaurants, dates, amounts)    | **Personal**      | Google Sheet; backend memory (cache); API responses on localhost only |
+| Gmail Message IDs, sheet row numbers               | Personal/internal | Sheet and backend parser only; never in API responses (tested)        |
+| Food illustrations, UI code                        | Public            | Repository and frontend bundle                                        |
 
 ## 2. Credential storage
 
@@ -22,8 +22,15 @@ implemented. Nothing marked [planned] should be assumed to protect anything toda
   placeholders.
 - **[in place]** Environment variables are validated at startup (`backend/src/config/env.ts`).
   Errors name the variable but never print its value (covered by a test).
-- **[planned]** Store the Google key file outside the project folder. In production, use the host's
-  secret manager or keyless workload identity.
+- **[in place]** Google credentials are read only by the backend, from
+  `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` (an **absolute** path; the setup guide stores it in
+  `~/.config/my-zomato-food-stack/` with `chmod 600`, outside the repo) or
+  `GOOGLE_SERVICE_ACCOUNT_JSON`. Only the `spreadsheets.readonly` scope is requested, and the sheet
+  is shared with the service account as Viewer. Credential errors never echo values (tested).
+- **[in place]** No Google value uses a `VITE_` prefix, so none can reach the frontend bundle. The
+  production bundle was checked: it contains no demo or order data.
+- **[planned]** In any future deployment, use the host's secret manager or keyless workload identity
+  instead of a key file.
 - **[in place, CI]** gitleaks scans the full Git history on every push and pull request. Note that
   `.gitignore` doesn't stop a determined `git add -f`; the scan is the backstop.
 
@@ -61,28 +68,38 @@ implemented. Nothing marked [planned] should be assumed to protect anything toda
   bodies and response bodies are never logged (verified by running the server with `?q=…` and
   inspecting the log).
 - **[in place]** 5xx errors log only the error name/code, not messages that might contain data.
-- **[planned]** The Sheets integration will log counts (rows read, rows rejected), never row
-  contents.
+- **[in place]** The Sheets integration logs only counts (`Order data refreshed`, rows read) and
+  safe codes (`Order data refresh failed`, `UPSTREAM_AUTH`, …). It never logs row contents,
+  Google's error bodies, tokens or the spreadsheet ID. `sheet:check` prints structure only.
 
 ## 5. API access control
 
-**[planned, required before any internet deployment.]** Today the API has no data endpoints and
-binds to `127.0.0.1` by default, so it's reachable only from this computer. **A private GitHub
-repository or an unguessable URL is not access control.**
+**Phase 2 decision ([ADR-0002](../architecture/ADR-0002-phase-2-data-access.md)): enforced
+local-only.** The API now serves personal data (`/api/orders`, `/api/insights`), so these
+controls are **[in place]** and tested:
 
-Before the backend serves order data beyond `localhost`, one of these must be chosen (as a new
-ADR) and implemented:
+1. **Loopback binding is mandatory.** `HOST` must be `127.0.0.1`, `::1` or `localhost`; anything
+   else (e.g. `0.0.0.0`) stops startup. Other devices on your network can't connect.
+2. **Host-header allow-list.** Requests whose `Host` isn't `localhost`, `127.0.0.1` or `[::1]` get
+   403 before any data is read. This blocks **DNS rebinding**, where a malicious website points its
+   own domain at `127.0.0.1` to read local services through your browser.
+3. **Cross-site browser requests are refused** (`Sec-Fetch-Site: cross-site` → 403), in addition to
+   the CORS allow-list. Other websites can't make your browser fetch this data.
+4. **`Cache-Control: no-store`** on every API response.
+5. Existing rate limiting (100/min per IP), body limit and safe errors still apply.
 
-1. **Stay local-only.** Run on your own machine; no internet exposure. Simplest; no new services.
-2. **Single-user passphrase login in the backend.** A long passphrase hashed with a slow hash
-   (e.g. scrypt/argon2), an `HttpOnly; Secure; SameSite=Strict` session cookie, and login rate
-   limiting. No third-party provider, but more code to get right.
-3. **An identity-aware proxy in front of the app** (e.g. a zero-trust access gateway with Google
-   sign-in limited to your account). Strong and little code, but it's an external service and
-   needs your approval.
+**Remaining risks (accepted for local use):**
 
-No authentication provider, OAuth integration or paid service will be added without your explicit
-approval.
+- Anyone or any program that can use **your logged-in computer** can open `localhost:5173` or
+  `localhost:3000` and read the data. There's no login. Lock your computer; don't run untrusted
+  software.
+- The key file grants read access to every sheet shared with the service account. Share only this
+  sheet with it.
+- **Before any deployment** beyond localhost, real authentication must be chosen and built: a
+  single-user passphrase login, or an identity-aware proxy (external service; needs your
+  approval). A private GitHub repository or an unguessable URL is **not** access control.
+
+No authentication provider, OAuth integration or paid service has been added.
 
 ## 6. Deployment security considerations [planned]
 

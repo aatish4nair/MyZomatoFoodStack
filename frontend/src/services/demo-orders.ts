@@ -88,15 +88,28 @@ const ROWS: readonly Row[] = [
   ],
 ];
 
-export const DEMO_ORDER_ROWS = ROWS.map(
-  ([orderId, orderDate, orderTime, restaurant, itemName, quantity, totalPaid]) => ({
-    orderId,
-    orderDate,
-    orderTime,
-    restaurant,
-    itemName,
-    quantity,
-    totalPaid,
-    orderStatus: 'Delivered',
-  }),
-);
+/** Rows sharing an order ID become one order (as the backend does with the real sheet). */
+function toOrders(rows: readonly Row[]) {
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) groups.set(row[0], [...(groups.get(row[0]) ?? []), row]);
+  return [...groups.values()].flatMap((group) => {
+    const first = group[0];
+    if (!first) return [];
+    const [orderId, orderDate, orderTime, restaurant] = first;
+    return [
+      {
+        orderId,
+        orderDate,
+        orderTime,
+        restaurant,
+        // Demo rows list line amounts; the order total is their sum, in whole paise.
+        totalPaidPaise: group.reduce((sum, r) => sum + Math.round(r[6] * 100), 0),
+        status: 'Delivered',
+        statusCategory: 'successful' as const,
+        items: group.map((r) => ({ name: r[4], quantity: r[5] })),
+      },
+    ];
+  });
+}
+
+export const DEMO_ORDERS = toOrders(ROWS);

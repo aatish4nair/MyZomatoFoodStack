@@ -62,6 +62,16 @@ npm run dev:frontend          # http://127.0.0.1:5173
 The data is **synthetic** (`frontend/src/services/demo-orders.ts`), and the pictures are
 temporary stand-ins until the final artwork is added (`docs/design/ART-BRIEF.md`).
 
+## Real data vs demo data
+
+- `npm run dev:backend` + `npm run dev:frontend`: **real data** from your Google Sheet. Set it up
+  with [GOOGLE-SHEETS-SETUP.md](GOOGLE-SHEETS-SETUP.md). Without it the page shows "Your orders
+  couldn't be loaded" (code `NOT_CONFIGURED`). It never falls back to demo data.
+- `npm run dev:demo`: frontend only, with **synthetic** orders. Good for design and animation work.
+- `npm run sheet:check`: connection and structure check (no personal data printed).
+- `npm run art:coverage`: which artwork your data needs; details go to the Git-ignored
+  `private/art-coverage.md`.
+
 ## Commands
 
 | Command                            | Purpose                                               |

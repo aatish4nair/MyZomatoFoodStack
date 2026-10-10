@@ -1,6 +1,7 @@
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import type { ApiError } from '@food-stack/shared';
+import { DATA_ERROR_MESSAGES, DataUnavailableError } from '../lib/data-errors.js';
 
 /**
  * Uniform, safe error responses: no stack traces, no echo of request input,
@@ -8,6 +9,18 @@ import type { ApiError } from '@food-stack/shared';
  */
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
+    if (error instanceof DataUnavailableError) {
+      // Only the safe code is logged; Google's own error details are never kept or forwarded.
+      request.log.warn({ code: error.code }, 'Order data unavailable');
+      const body: ApiError = {
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: DATA_ERROR_MESSAGES[error.code],
+        code: error.code,
+      };
+      return reply.status(503).send(body);
+    }
+
     if (hasZodFastifySchemaValidationErrors(error)) {
       const body: ApiError = {
         statusCode: 400,

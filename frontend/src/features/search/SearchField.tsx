@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type Ref } from 'react';
 import { useRotatingPlaceholder } from './useRotatingPlaceholder';
 
 interface SearchFieldProps {
@@ -7,6 +7,7 @@ interface SearchFieldProps {
   /** Display names (brackets already removed) for the rotating placeholder. */
   suggestions: readonly string[];
   reducedMotion: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -14,7 +15,13 @@ interface SearchFieldProps {
  * placeholder can't animate); it pauses while the field is focused or has text and resumes once
  * the field is empty and no longer focused.
  */
-export function SearchField({ value, onChange, suggestions, reducedMotion }: SearchFieldProps) {
+export function SearchField({
+  value,
+  onChange,
+  suggestions,
+  reducedMotion,
+  inputRef,
+}: SearchFieldProps) {
   const [focused, setFocused] = useState(false);
   const inputId = useId();
   const paused = focused || value.length > 0;
@@ -27,6 +34,7 @@ export function SearchField({ value, onChange, suggestions, reducedMotion }: Sea
         Search your food orders
       </label>
       <input
+        ref={inputRef}
         id={inputId}
         className="search__input"
         type="search"

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
-import type { OrderLine } from '@food-stack/shared';
+import type { Order } from '@food-stack/shared';
 import type { OrderSource } from '../services/order-source';
 
 export type OrdersState =
-  | { status: 'loading'; orders: readonly OrderLine[] }
-  | { status: 'ready'; orders: readonly OrderLine[] }
-  | { status: 'unavailable'; orders: readonly OrderLine[] };
+  | { status: 'loading'; orders: readonly Order[] }
+  | { status: 'ready'; orders: readonly Order[] }
+  | { status: 'unavailable'; orders: readonly Order[] };
 
-const EMPTY: readonly OrderLine[] = [];
+const EMPTY: readonly Order[] = [];
 
-/** Loads orders once. A failure degrades to an empty dataset; the page still works. */
+/**
+ * Loads orders once. On failure the state is `unavailable` with no orders: the page shows a quiet
+ * error message and never substitutes demo data.
+ */
 export function useOrders(source: OrderSource): OrdersState {
   const [state, setState] = useState<OrdersState>({ status: 'loading', orders: EMPTY });
 

@@ -24,7 +24,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "audit:deps": "npm audit --audit-level=high",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "sheet:check": "npm run sheet:check -w @food-stack/backend",
+    "dev:demo": "npm run dev:demo -w @food-stack/frontend",
+    "art:coverage": "npm run art:coverage -w @food-stack/backend"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

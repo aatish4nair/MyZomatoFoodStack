@@ -1,12 +1,17 @@
+import { roundPaiseToRupees } from '@food-stack/shared';
+
 const RUPEES = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 });
 
-/** "₹366.04" */
-export const formatRupees = (amount: number): string => RUPEES.format(amount);
+/**
+ * DISPLAY ONLY: whole rupees, rounded half up from the exact paise total
+ * (198539 paise → "₹1,985"; 198550 → "₹1,986"). Calculations stay in paise.
+ */
+export const formatRupees = (paise: number): string => RUPEES.format(roundPaiseToRupees(paise));
 
 const LONG_DATE = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
