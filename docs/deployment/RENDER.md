@@ -77,7 +77,41 @@ the key's contents. _(Render)_ It is available to the service at `/etc/secrets/s
 The server refuses to start (and says which setting is wrong, never its value) if `HOST=0.0.0.0` is
 used without `NODE_ENV=production` and an allowed hostname.
 
-Check: open `https://<backend>.onrender.com/api/health`; it shows `{"status":"ok"}`.
+### Check the backend
+
+**1. Health.** Paste `https://<backend>.onrender.com/api/health` into the browser's address bar, or
+run:
+
+```sh
+curl -s https://<backend>.onrender.com/api/health
+```
+
+Either shows `{"status":"ok"}`. The health check contains no order data or configuration, so it
+answers in every case. (Before this was fixed, _clicking_ the link from another website, such as the
+Render dashboard, returned 403 "Cross-site requests are not allowed": browsers mark such clicks as
+cross-site, and the guard refused them. The data endpoints still refuse cross-site requests; the
+website itself is unaffected because it calls `/api/*` on its own origin.)
+
+**2. Google Sheets connection.** This prints **only the HTTP status code**, never order data:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' https://<backend>.onrender.com/api/orders
+```
+
+- `200`: the endpoint responded successfully, so the sheet was read.
+- `503`: the sheet could not be read. Show the safe error code (it contains no order data or
+  credentials):
+
+  ```sh
+  curl -s https://<backend>.onrender.com/api/orders | grep -o '"code":"[A-Z_]*"'
+  ```
+
+  `NOT_CONFIGURED`: `GOOGLE_SHEET_ID` or the credential setting is missing. `UPSTREAM_AUTH`: the key
+  couldn't be loaded or Google refused it (check that the Secret File holds the **whole** JSON key,
+  is named `service-account.json`, matches `GOOGLE_SERVICE_ACCOUNT_KEY_FILE`, and that the sheet is
+  shared with that key's `client_email`). `UPSTREAM_NOT_FOUND`: wrong sheet ID or tab name.
+
+- `403`: the request's hostname isn't allowed (see `ALLOWED_HOSTS`).
 
 ## 2. Frontend: Render Static Site
 

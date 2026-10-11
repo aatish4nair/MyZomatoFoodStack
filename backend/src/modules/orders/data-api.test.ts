@@ -173,6 +173,33 @@ describe('local-only access control', () => {
     expect((await get('/api/orders', { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
     expect((await get('/api/orders', { 'sec-fetch-site': 'same-origin' })).statusCode).toBe(200);
   });
+
+  it('refuses cross-site requests to every data endpoint, but lets the health check through', async () => {
+    await start();
+    for (const url of ['/api/orders', '/api/insights', '/api/orders?month=all']) {
+      const res = await get(url, { 'sec-fetch-site': 'cross-site' });
+      expect(res.statusCode).toBe(403);
+      expect(ApiErrorSchema.parse(res.json()).message).toBe('Cross-site requests are not allowed.');
+      expect(res.body).not.toContain('Imaginary Tandoor');
+    }
+    // A link to the health check on another site (e.g. the Render dashboard) works: no data in it.
+    const health = await get('/api/health', { 'sec-fetch-site': 'cross-site' });
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toEqual({ status: 'ok' });
+    expect(health.headers['cache-control']).toBe('no-store');
+  });
+
+  it('keeps the local hostname check on data endpoints (DNS-rebinding protection)', async () => {
+    await start();
+    for (const url of ['/api/orders', '/api/insights']) {
+      for (const host of ['evil.example', 'evil.example:3000', 'my-api.onrender.com']) {
+        expect((await get(url, { host })).statusCode).toBe(403);
+      }
+    }
+    // The exemption is for GET /api/health only, not for paths that merely start with it.
+    expect((await get('/api/health/../orders', { host: 'evil.example' })).statusCode).toBe(403);
+    expect((await get('/api/healthz', { host: 'evil.example' })).statusCode).toBe(403);
+  });
 });
 
 describe('public deployment (production settings)', () => {
@@ -210,13 +237,29 @@ describe('public deployment (production settings)', () => {
     expect(res.json()).toEqual({ status: 'ok' });
   });
 
-  it('still refuses cross-site browser requests and keeps the security headers', async () => {
+  it('lets the health check through from a link on another site (e.g. the Render dashboard)', async () => {
     await startProd();
-    const crossSite = await get('/api/orders', {
+    const res = await get('/api/health', {
       host: 'my-api.onrender.com',
       'sec-fetch-site': 'cross-site',
+      'sec-fetch-mode': 'navigate',
+      referer: 'https://dashboard.render.com/',
     });
-    expect(crossSite.statusCode).toBe(403);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: 'ok' });
+    expect(res.body).not.toMatch(/orders|GOOGLE|sheet/i);
+  });
+
+  it('still refuses cross-site browser requests and keeps the security headers', async () => {
+    await startProd();
+    for (const url of ['/api/orders', '/api/insights']) {
+      const crossSite = await get(url, {
+        host: 'my-api.onrender.com',
+        'sec-fetch-site': 'cross-site',
+      });
+      expect(crossSite.statusCode).toBe(403);
+      expect(crossSite.body).not.toContain('Imaginary Tandoor');
+    }
     const res = await get('/api/orders', { host: 'my-site.onrender.com' });
     expect(res.headers['content-security-policy']).toContain("default-src 'none'");
     expect(res.headers['x-content-type-options']).toBe('nosniff');
