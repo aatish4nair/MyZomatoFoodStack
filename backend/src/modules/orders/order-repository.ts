@@ -1,6 +1,6 @@
 import type { Order } from '@food-stack/shared';
 import type { SheetValuesReader } from '../../integrations/google-sheets/sheets-reader.js';
-import { DataUnavailableError } from '../../lib/data-errors.js';
+import { DataUnavailableError, type DataErrorReason } from '../../lib/data-errors.js';
 import { parseSheet, type ParseResult } from './parse-sheet.js';
 
 export interface OrderSnapshot {
@@ -22,8 +22,12 @@ export interface RepositoryOptions {
   retryAfterFailureMs?: number;
   maxRows: number;
   now?: () => number;
-  /** Receives only safe facts (a code or counts), never data. */
-  onEvent?: (event: { type: 'refreshed'; rows: number } | { type: 'failed'; code: string }) => void;
+  /** Receives only safe facts (a code, a fixed-list reason or counts), never data. */
+  onEvent?: (
+    event:
+      | { type: 'refreshed'; rows: number }
+      | { type: 'failed'; code: string; reason?: DataErrorReason },
+  ) => void;
 }
 
 /**
@@ -57,7 +61,11 @@ export function createOrderRepository(
       const safe =
         error instanceof DataUnavailableError ? error : new DataUnavailableError('UPSTREAM_ERROR');
       lastFailure = { at: now(), error: safe };
-      options.onEvent?.({ type: 'failed', code: safe.code });
+      options.onEvent?.({
+        type: 'failed',
+        code: safe.code,
+        ...(safe.reason ? { reason: safe.reason } : {}),
+      });
       if (snapshot) return { ...snapshot, stale: true };
       throw safe;
     }

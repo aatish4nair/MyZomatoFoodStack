@@ -298,3 +298,59 @@ describe('public deployment (production settings)', () => {
     expect(ApiErrorSchema.parse(bad.json()).message).toBe('Request validation failed');
   });
 });
+
+describe('authentication diagnostics stay server-side', () => {
+  const SECRET_EMAIL = 'svc-account@secret-project.iam.gserviceaccount.com';
+  const EXPECTED_BODY =
+    '{"statusCode":503,"error":"Service Unavailable","message":"The server could not access the spreadsheet (check credentials and sharing).","code":"UPSTREAM_AUTH"}';
+
+  /** Builds the app with a failing reader and captures every warn log line (app + request). */
+  async function failingApp(error: DataUnavailableError) {
+    app = await buildApp(loadEnv({ NODE_ENV: 'test' }), {
+      sheetsReader: { readValues: () => Promise.reject(error) },
+    });
+    const logged: unknown[] = [];
+    vi.spyOn(app.log, 'warn').mockImplementation((...args: unknown[]) => {
+      logged.push(args);
+    });
+    app.addHook('onRequest', (request, _reply, done) => {
+      vi.spyOn(request.log, 'warn').mockImplementation((...args: unknown[]) => {
+        logged.push(args);
+      });
+      done();
+    });
+    return logged;
+  }
+
+  it('keeps the public error response byte-for-byte unchanged, with or without a reason', async () => {
+    await failingApp(new DataUnavailableError('UPSTREAM_AUTH', 'key-file-not-found'));
+    const withReason = await get('/api/orders');
+    await app?.close();
+    await failingApp(new DataUnavailableError('UPSTREAM_AUTH'));
+    const withoutReason = await get('/api/orders');
+    expect(withReason.statusCode).toBe(503);
+    expect(withReason.body).toBe(EXPECTED_BODY);
+    expect(withoutReason.body).toBe(EXPECTED_BODY);
+    expect(withReason.body).not.toContain('key-file');
+    expect(withReason.body).not.toContain('reason');
+  });
+
+  it('logs the code and fixed-list reason, and nothing sensitive', async () => {
+    const logged = await failingApp(new DataUnavailableError('UPSTREAM_AUTH', 'sheets-403'));
+    expect((await get('/api/insights')).statusCode).toBe(503);
+    const captured = JSON.stringify(logged);
+    // Both log sites (refresh failure + request failure) carry the reason.
+    expect(logged.length).toBeGreaterThanOrEqual(2);
+    expect(captured).toContain('"code":"UPSTREAM_AUTH"');
+    expect(captured).toContain('"reason":"sheets-403"');
+    for (const secret of [
+      SECRET_EMAIL,
+      'BEGIN PRIVATE KEY',
+      'Bearer',
+      'Imaginary Tandoor',
+      GMAIL_ID,
+    ]) {
+      expect(captured).not.toContain(secret);
+    }
+  });
+});

@@ -8,6 +8,7 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { allowedHostnames, sheetsConfig, type Env } from './config/env.js';
+import { logCredentialCheck } from './integrations/google-sheets/credential-check.js';
 import {
   createSheetsReader,
   type SheetValuesReader,
@@ -72,6 +73,9 @@ export async function buildApp(env: Env, deps: AppDeps = {}): Promise<FastifyIns
   });
 
   const config = sheetsConfig(env);
+  // Once at startup, for the real Google reader: is the configured key file present and shaped
+  // like a service-account key? Logs yes/no facts only (see credential-check.ts).
+  if (deps.sheetsReader === undefined && config) logCredentialCheck(app.log, config.credentials);
   const reader =
     deps.sheetsReader !== undefined
       ? deps.sheetsReader
@@ -84,7 +88,7 @@ export async function buildApp(env: Env, deps: AppDeps = {}): Promise<FastifyIns
     ...(deps.now ? { now: deps.now } : {}),
     onEvent: (event) => {
       if (event.type === 'refreshed') app.log.info({ rows: event.rows }, 'Order data refreshed');
-      else app.log.warn({ code: event.code }, 'Order data refresh failed');
+      else app.log.warn({ code: event.code, reason: event.reason }, 'Order data refresh failed');
     },
   });
 

@@ -20,8 +20,9 @@ const CLIENT_ERROR_MESSAGES: Readonly<Record<number, string>> = {
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     if (error instanceof DataUnavailableError) {
-      // Only the safe code is logged; Google's own error details are never kept or forwarded.
-      request.log.warn({ code: error.code }, 'Order data unavailable');
+      // Only the safe code and fixed-list reason are logged (the reason never reaches the browser);
+      // Google's own error details are never kept or forwarded.
+      request.log.warn({ code: error.code, reason: error.reason }, 'Order data unavailable');
       const body: ApiError = {
         statusCode: 503,
         error: 'Service Unavailable',

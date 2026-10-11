@@ -1,7 +1,7 @@
 import { GoogleAuth } from 'google-auth-library';
 import { z } from 'zod';
 import type { SheetsConfig } from '../../config/env.js';
-import { DataUnavailableError } from '../../lib/data-errors.js';
+import { DataUnavailableError, type DataErrorReason } from '../../lib/data-errors.js';
 
 /** The ONLY scope requested: read-only access to spreadsheets shared with the service account. */
 export const SHEETS_READONLY_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
@@ -37,10 +37,10 @@ export function createSheetsReader(config: SheetsConfig, deps: ReaderDeps = {}):
         (error: unknown) => {
           throw error instanceof DataUnavailableError
             ? error
-            : new DataUnavailableError('UPSTREAM_AUTH');
+            : new DataUnavailableError('UPSTREAM_AUTH', authFailureReason(error));
         },
       );
-      if (!token) throw new DataUnavailableError('UPSTREAM_AUTH');
+      if (!token) throw new DataUnavailableError('UPSTREAM_AUTH', 'no-token');
 
       let response: Response;
       try {
@@ -52,7 +52,15 @@ export function createSheetsReader(config: SheetsConfig, deps: ReaderDeps = {}):
         throw new DataUnavailableError(isTimeout(error) ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_ERROR');
       }
 
-      if (!response.ok) throw new DataUnavailableError(codeForStatus(response.status));
+      if (!response.ok) {
+        const reason =
+          response.status === 401
+            ? 'sheets-401'
+            : response.status === 403
+              ? 'sheets-403'
+              : undefined;
+        throw new DataUnavailableError(codeForStatus(response.status), reason);
+      }
 
       let body: unknown;
       try {
@@ -76,6 +84,28 @@ function defaultTokenSource(config: SheetsConfig): () => Promise<string | null |
           scopes: [SHEETS_READONLY_SCOPE],
         });
   return () => auth.getAccessToken();
+}
+
+/**
+ * Classifies a credential-loading or token failure into a fixed reason. Uses only the error's
+ * system code, its HTTP status and a fixed message prefix used by google-auth-library for bad
+ * JSON (checked, never logged). Verified against google-auth-library's actual errors:
+ * ENOENT / EACCES / EISDIR from reading the key file; "Invalid JSON key file…" for invalid JSON;
+ * code MISSING_CREDENTIALS for missing fields; ERR_OSSL_* for an unusable private key; a
+ * GaxiosError with an HTTP response from the token endpoint; a GaxiosError with a system code
+ * (ECONNREFUSED, ENOTFOUND, …) and no response when the endpoint can't be reached.
+ */
+export function authFailureReason(error: unknown): DataErrorReason {
+  if (!(error instanceof Error)) return 'unknown-auth-error';
+  const { code, response } = error as { code?: unknown; response?: { status?: unknown } };
+  if (code === 'ENOENT') return 'key-file-not-found';
+  if (code === 'EACCES' || code === 'EISDIR' || code === 'EPERM') return 'key-file-unreadable';
+  if (code === 'MISSING_CREDENTIALS') return 'key-missing-fields';
+  if (typeof code === 'string' && code.startsWith('ERR_OSSL')) return 'key-unusable';
+  if (error.message.startsWith('Invalid JSON key file')) return 'key-invalid-json';
+  if (typeof response?.status === 'number') return 'token-rejected';
+  if (typeof code === 'string' && /^E[A-Z_]+$/.test(code)) return 'token-network-error';
+  return 'unknown-auth-error';
 }
 
 export function codeForStatus(status: number): DataUnavailableError['code'] {
