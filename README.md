@@ -6,8 +6,14 @@ where from and when.
 
 > **Status: Phase 2 (Google Sheets data), awaiting review.** The page, animation and search
 > (Phase 1) now read **real orders** from the backend, which reads the Google Sheet with a read-only
-> service account. The app is **local-only** (it refuses to run on a public address) and uses
-> **temporary placeholder artwork**. Connect your sheet with
+> service account. By default it runs **only on your computer** (the backend binds to `127.0.0.1` and
+> answers only to `localhost`). It can also be configured for a **public deployment on Render**, where
+> the order history is intentionally public, with no login: see
+> [docs/deployment/RENDER.md](docs/deployment/RENDER.md). **Dish images:** most dishes show a food
+> photo matched by dish name (some photos are shared between similar dishes, such as combos and
+> variants, and sizes and quality vary); the rest intentionally show a cartoon stand-in from My
+> Food Pile, and the falling footer pile uses those cartoon sprites. `npm run art:coverage` reports
+> the current coverage. Connect your sheet with
 > [docs/development/GOOGLE-SHEETS-SETUP.md](docs/development/GOOGLE-SHEETS-SETUP.md).
 
 The food illustrations and physics approach come from

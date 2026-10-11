@@ -5,26 +5,26 @@ photorealistic renders of a real plated dish, with warm lighting, suited to the 
 must look like **that dish**, not merely the same broad category (tandoori chicken is red-orange
 and charred; Afghani chicken is creamy and pale; veg biryani has no chicken on top).
 
-**Interim plate art:** `plates/tandoori-chicken.png` is cropped (plate only, 600×600) from the
-owner's approved design image `docs/design/approved-design.png`, with the owner's approval. Replace it
-with a higher-resolution file of the same name whenever available. No other final artwork exists yet.
-The 16 My Food Pile images bundled from
+**Plate art (2026-10-11):** the owner supplies one image per dish, named after the dish as it
+appears in the app (e.g. `Butter Naan.jpg`). The earlier interim `tandoori-chicken.png` crop has
+been removed. The 16 My Food Pile images bundled from
 `frontend/src/assets/food/` are **temporary, toy-style stand-ins**, used only where they show the
 same dish.
 
 ## Two kinds of image
 
-| Kind          | Used for                                    | Size                      | Folder                                 |
-| ------------- | ------------------------------------------- | ------------------------- | -------------------------------------- |
-| **Plate**     | The single dish on the right after a search | 1024×1024 transparent PNG | `frontend/src/assets/plates/<key>.png` |
-| **Pile item** | The falling footer collage                  | 512×512 transparent PNG   | `frontend/src/assets/pile/<key>.png`   |
+| Kind          | Used for                                    | Size                                                 | Folder                                                            |
+| ------------- | ------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| **Plate**     | The single dish on the right after a search | Square, 1024×1024 or larger; PNG, JPEG, WebP or AVIF | `frontend/src/assets/plates/<Dish name>.<ext>` (or `<key>.<ext>`) |
+| **Pile item** | The falling footer collage                  | 512×512 transparent PNG                              | `frontend/src/assets/pile/<key>.png`                              |
 
 Files are picked up by name on the next build (or immediately in `npm run dev:frontend`). No code
 changes are needed.
 
 ## Rules for every image
 
-1. Transparent background (cut out); no table, floor or background colour.
+1. Pile items: transparent background (cut out). Plates: transparent, or a background close to the
+   page colour `#FBF8F3`.
 2. **Plates:** a three-quarter top-down view of one round cream/white plate or bowl with the dish and
    light garnish (e.g. tandoori chicken with green chutney, onion rings, lemon). A soft shadow under
    the plate only.
@@ -38,14 +38,16 @@ changes are needed.
 
 Defined in `shared/src/lib/food-category.ts` (first matching rule wins). The app looks for, in order:
 
-1. `plates/<key>.png`;
-2. a **category-level fallback** `plates/<parent>.png`, if the key has a parent;
+1. an image named after **the dish itself** (compared ignoring case, punctuation, "&"/"and", word
+   order and pack sizes), or an owner-chosen alias in `PLATE_ALIASES`
+   (`frontend/src/features/food-art/registry.ts`);
+2. `plates/<key>.<ext>`, then a **category-level fallback** `plates/<parent>.<ext>`;
 3. a stand-in that shows **exactly** this dish;
 4. otherwise, a **neutral empty plate**. It never shows an unrelated dish.
 
 | Key                | Example item names                         | Fallback (parent)         | Stand-in today      |
 | ------------------ | ------------------------------------------ | ------------------------- | ------------------- |
-| `tandoori-chicken` | Tandoori Chicken, Chicken Tandoori, Tangdi | —                         | **interim plate ✓** |
+| `tandoori-chicken` | Tandoori Chicken, Chicken Tandoori, Tangdi | —                         | none                |
 | `afghani-chicken`  | Afghani / Malai / Tandoori Malai Chicken   | `chicken-curry` → `curry` | none                |
 | `chicken-curry`    | Butter Chicken, Chicken Tikka Masala       | `curry`                   | none                |
 | `chicken-tikka`    | Chicken Tikka, Chicken Seekh Kebab         | `kebab`                   | none                |
@@ -86,9 +88,7 @@ Defined in `shared/src/lib/food-category.ts` (first matching rule wins). The app
 ## What YOUR data needs
 
 Run `npm run art:coverage`. It writes `private/art-coverage.md` (Git-ignored; it contains your food
-names) listing every art key your orders use, which plate files are still needed, and the foods
-that match no key. **Prioritise the plates at the top of that list.** For foods with no key, tell
-Claude which picture they should use, and a key will be added in one place.
+names) listing **the dishes that still have no image of their own**, every art key your orders use
+and the foods that match no key. The terminal shows totals only.
 
-Status on 2026-10-10: your data uses **24 keys**; `tandoori-chicken` now has interim plate art, so
-**23 plate images are still needed**, and 19 distinct foods match no key yet.
+Status on 2026-10-11: **37 of 77** dishes have their own image (38 including aliases).

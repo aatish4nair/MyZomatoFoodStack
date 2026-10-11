@@ -16,9 +16,9 @@ ignored), so reordering columns doesn't break anything.
 | Sheet column     | Required | Becomes                      | Rules                                                                                                                                                                        |
 | ---------------- | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | S. No.           | no       | _(not used)_                 | Ignored; never sent to the browser. Not used for duplicate detection.                                                                                                        |
-| Order ID         | **yes**  | `orderId`                    | Text, or a whole number (written without scientific notation). Groups rows into one order.                                                                                   |
+| Order ID         | **yes**  | `orderId`                    | Text, or a whole number (written without scientific notation). Groups rows into one order. **Not sent to the browser:** the API uses an opaque `o0001`-style ID.             |
 | Order Date       | **yes**  | `orderDate` (`YYYY-MM-DD`)   | Sheets date, `YYYY-MM-DD`, **day-first** `DD/MM/YYYY` (also `-` or `.`), `DD Mon YYYY`, `Mon DD, YYYY`. Month-first is never assumed. Impossible dates (31/02) are rejected. |
-| Order Time       | no       | `orderTime` (`HH:mm`) / null | Sheets time, `HH:mm[:ss]`, or `h:mm[:ss] AM/PM`. Blank or unreadable → null (the row is kept).                                                                               |
+| Order Time       | no       | `orderTime` (`HH:mm`) / null | Sheets time, `HH:mm[:ss]`, or `h:mm[:ss] AM/PM`. Blank or unreadable → null (the row is kept). Internal only; not in API responses.                                          |
 | Restaurant       | **yes**  | `restaurant`                 | Trimmed text. Compared exactly (so "Domino's" and "Dominos" are different restaurants).                                                                                      |
 | Item Name        | **yes**  | `items[].name`               | Original text is kept exactly (brackets included). A cell may list several items separated by `;`.                                                                           |
 | Quantity         | no       | `items[].quantity` / null    | Positive whole number. With several items, a `;`-list of the **same length** pairs up; otherwise unknown.                                                                    |
@@ -56,14 +56,19 @@ Unsuccessful wording wins ("Delivery failed" → unsuccessful).
 
 - **Matching:** every typed word must match the start of a word in an **original** item name, in any
   order. Brackets are removed **only for display**.
-- **Variants:** matching items are grouped by display name. A generic query that matches several
-  foods returns a `clarify` outcome (the real variants) instead of merging them; an exact food name
-  or a single match returns that one food. A result always covers exactly one food.
+- **Dish Type and Dish Category** (`shared/src/lib/dish-category.ts`): every original item name maps
+  to a Dish Type (its display name, ignoring case, punctuation, word order, pack sizes and counts)
+  and one broad Dish Category (ordered keyword rules plus explicit overrides; `Other` when nothing
+  fits). Derived on the fly for all historical and new orders; the sheet is unchanged.
+  `npm run dish:categories` reports the mapping and any `Other` dishes (details in `private/`).
+- **Suggestions, not automatic results:** typing returns suggestions (categories, then dishes). A
+  result appears only for an explicitly picked category (all its variants) or dish (that dish only).
 - **Count:** distinct matching **orders** (by order ID), not item occurrences.
-- **Amount paid:** the sum of the matching orders' **whole-order totals**, each counted once. The
-  sheet has no per-item prices, so an order's total includes its other items. If some matching
-  orders have no known total, the amount covers the rest and the UI says "amount missing for N
-  orders".
+- **Amount paid:** the sum of Total Paid over matching orders that contain **only** the picked
+  category/dish, each counted once. The sheet has no per-item prices, so an order that also contains
+  other dishes is counted but its total is **not** attributed; the UI says "excludes N orders that
+  also had other dishes", or "Amount not known" when every order had other dishes. Orders with no
+  known total are reported as "amount missing for N orders".
 - **Restaurant / date / name:** from the most recent matching order.
 - **Quantity:** the sum over matching items, or "not recorded" if any of them is unknown.
 
@@ -94,5 +99,5 @@ Over counted orders in the selected month, each order ID once:
 
 ## Remaining limitation
 
-- **Search amounts for multi-item orders** include the whole order's total (the sheet has no
-  per-item prices). This affects 33 of 83 orders.
+- **Search amounts leave out multi-item orders** that contain other dishes (the sheet has no
+  per-item prices; 33 of 83 orders have several items), so amounts can be partial; the UI says so.

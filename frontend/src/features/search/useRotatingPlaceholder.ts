@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 
-export const PLACEHOLDER_INTERVAL_MS = 1000;
+/** How long each name stays visible: comfortably over one second, for a calmer rotation. */
+export const PLACEHOLDER_INTERVAL_MS = 1800;
 
 /**
- * Cycles through `names` once per second while `paused` is false. With reduced motion the
- * placeholder stays on the first name instead of changing every second.
+ * Cycles through `names`, one every PLACEHOLDER_INTERVAL_MS, while `paused` is false. The first name
+ * shows immediately, and each pause or resume restarts the interval, so every name stays visible
+ * for the full interval. With reduced motion the placeholder stays on the first name.
  * Returns the name to show (empty string when there are no names).
  */
 export function useRotatingPlaceholder(

@@ -8,7 +8,7 @@ artwork.
 ## Page
 
 - [x] Warm off-white background.
-- [x] Header title **"My Zomato food Stack"**, with "Zomato" in red.
+- [x] Header title **"My Zomato food stack"**, with "Zomato" in red.
 - [x] Month selector beside the title.
 - [x] Search field on the left with a thin underline.
 - [x] Left column after a matching search: large **matching order count**, **food name**, **amount
@@ -28,16 +28,28 @@ artwork.
 
 ## Search
 
-- [x] An animated placeholder cycles through **food names from the order data**, changing every
-      **1 second**. _(Real sheet data from Phase 2; synthetic only in `npm run dev:demo`.)_
+- [x] An animated placeholder cycles through **food names from the order data**; each stays
+      visible for **about 1.8 seconds** (at least one second). _(Real sheet data from Phase 2; synthetic only in `npm run dev:demo`.)_
 - [x] Bracketed text never appears in placeholder suggestions **or the result title**. Use `toDisplayName()` from
       `@food-stack/shared` (**built and tested in Phase 0**). The original item names are kept
       unchanged in the data.
-- [x] The placeholder animation pauses while the field is focused or has text, and resumes once
-      it is empty and no longer focused. With reduced motion it shows a stable placeholder.
+- [x] The placeholder animation pauses while the field has text and resumes once it is cleared
+      (it keeps rotating while the empty field has focus). With reduced motion it shows a stable
+      placeholder.
+- [x] On mouse/trackpad devices the search field is focused when the page appears and after clicks
+      on non-interactive areas or a month picked with the mouse. Keyboard use of other controls is
+      never interrupted, and touch devices are never auto-focused (no surprise keyboard).
+- [x] The month selector opens on **All Months**, followed by the months with orders grouped by
+      year (latest year first, newest month first, dividers between groups).
 - [x] Results update according to the selected month.
-- [x] A generic query matching several foods asks which one ("Which biryani are you looking
-      for?") using the real variants; an exact name or a single variant shows results directly.
+- [x] Autocomplete: typing lists suggestions (categories such as "Biryani · All variants", then
+      dishes) and never selects one; the user picks with mouse, touch, or ↓/↑ + Enter. Escape
+      closes the list. Picking a category shows every variant in the selected range; picking a dish
+      shows only that dish.
+- [x] Every item name maps to one Dish Category and a Dish Type (`dish-category.ts`); unknown
+      names go to `Other`, reported by `npm run dish:categories`.
+- [x] An order's Total Paid is only counted for a dish/category when the order contains nothing
+      else (no item prices exist); otherwise the amount note says it was left out.
 - [x] Amounts are displayed in whole rupees (rounded half up, display only; totals stay in paise).
 - [x] The large result number is bold and upright.
 - [ ] Photorealistic plate artwork for each dish (owner to supply; see ART-BRIEF.md and
@@ -51,8 +63,8 @@ artwork.
       frontend never sees credentials, the sheet ID or Gmail Message IDs.
 - [x] The four metrics (total spending, total orders, average spending, most-ordered restaurant)
       are available from `GET /api/insights`. **Not shown in the UI**, by design.
-- Mapping and policies: [DATA-MAPPING.md](../architecture/DATA-MAPPING.md). Its "Open questions"
-  must be confirmed with `npm run sheet:check`.
+- Mapping and policies: [DATA-MAPPING.md](../architecture/DATA-MAPPING.md). Its former open
+  questions were resolved against the real sheet with `npm run sheet:check` (2026-10-10).
 
 ## Artwork
 

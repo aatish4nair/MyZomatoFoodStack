@@ -297,6 +297,24 @@ body {
   font-weight: 600;
 }
 
+.result__paid--unknown {
+  color: var(--color-muted);
+  font-size: clamp(18px, min(1.6vw, 3vh), 24px);
+  font-weight: 600;
+}
+
+.result__paid--unknown .result__note {
+  font-size: 0.6em;
+}
+
+.result__variants {
+  margin: clamp(10px, 2vh, 18px) 0 0;
+  max-width: 600px;
+  color: var(--color-muted);
+  font-size: clamp(13px, min(0.95vw, 1.9vh), 15px);
+  line-height: 1.5;
+}
+
 .result__note {
   color: var(--color-muted);
   font-size: 0.4em;
@@ -315,51 +333,55 @@ body {
   font-size: clamp(16px, 1.3vw, 20px);
 }
 
-/* ---------- clarification: "Which biryani are you looking for?" ---------- */
+/* ---------- autocomplete suggestions ---------- */
 
-.clarify__question {
+.suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 5;
   margin: 0;
-  font-size: clamp(18px, 1.5vw, 24px);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
-.clarify__options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 16px 0 0;
-  padding: 0;
+  padding: 6px;
   list-style: none;
-  max-width: 730px;
+  max-height: min(360px, 50vh);
+  overflow-y: auto;
+  background: var(--color-background);
+  border: 1.5px solid var(--color-pill);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgb(28 28 28 / 10%);
 }
 
-.clarify__option {
+.suggestions[hidden] {
+  display: none;
+}
+
+.suggestions__option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
   min-height: 44px; /* comfortable touch target */
-  padding: 0.55em 1.2em;
-  border: 1.5px solid transparent;
-  border-radius: 999px;
-  background: var(--color-pill);
+  padding: 0.6em 0.9em;
+  border-radius: 10px;
   color: var(--color-ink);
-  font: inherit;
   font-size: clamp(15px, 1.15vw, 18px);
-  font-weight: 500;
   cursor: pointer;
 }
 
-.clarify__option:hover {
-  border-color: var(--color-brand-red);
+.suggestions__option[aria-selected='true'] {
+  background: var(--color-pill);
 }
 
-.clarify__option:focus-visible {
-  outline: 2px solid var(--color-brand-red);
-  outline-offset: 2px;
+.suggestions__option--category .suggestions__name {
+  font-weight: 600;
+  color: var(--color-brand-red);
 }
 
-.clarify__more {
-  margin: 14px 0 0;
+.suggestions__meta {
+  flex: none;
   color: var(--color-muted);
-  font-size: clamp(14px, 1.1vw, 16px);
+  font-size: 0.82em;
 }
 
 /* ---------- plate ---------- */

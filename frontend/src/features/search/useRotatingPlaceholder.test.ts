@@ -15,19 +15,22 @@ describe('useRotatingPlaceholder', () => {
     vi.useFakeTimers();
   });
 
-  it('changes name exactly every second and wraps around', () => {
+  it('shows the first name at once and keeps each name for 1.5–2 seconds, wrapping around', () => {
     const { result } = renderHook(() =>
       useRotatingPlaceholder(NAMES, { paused: false, reducedMotion: false }),
     );
-    expect(PLACEHOLDER_INTERVAL_MS).toBe(1000);
+    expect(PLACEHOLDER_INTERVAL_MS).toBeGreaterThanOrEqual(1500);
+    expect(PLACEHOLDER_INTERVAL_MS).toBeLessThanOrEqual(2000);
     expect(result.current).toBe('Idly');
-    advance(999);
+    advance(1000);
+    expect(result.current).toBe('Idly'); // still visible after a full second
+    advance(PLACEHOLDER_INTERVAL_MS - 1001);
     expect(result.current).toBe('Idly');
     advance(1);
     expect(result.current).toBe('Masala Dosa');
-    advance(1000);
+    advance(PLACEHOLDER_INTERVAL_MS);
     expect(result.current).toBe('Tandoori Chicken');
-    advance(1000);
+    advance(PLACEHOLDER_INTERVAL_MS);
     expect(result.current).toBe('Idly');
   });
 
@@ -36,13 +39,14 @@ describe('useRotatingPlaceholder', () => {
       ({ paused }) => useRotatingPlaceholder(NAMES, { paused, reducedMotion: false }),
       { initialProps: { paused: false } },
     );
-    advance(1000);
+    advance(PLACEHOLDER_INTERVAL_MS);
     expect(result.current).toBe('Masala Dosa');
     rerender({ paused: true });
-    advance(5000);
+    advance(PLACEHOLDER_INTERVAL_MS * 3);
     expect(result.current).toBe('Masala Dosa');
+    expect(vi.getTimerCount()).toBe(0); // no timer while paused
     rerender({ paused: false });
-    advance(1000);
+    advance(PLACEHOLDER_INTERVAL_MS);
     expect(result.current).toBe('Tandoori Chicken');
   });
 
@@ -67,10 +71,13 @@ describe('useRotatingPlaceholder', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('clears its interval on unmount', () => {
-    const { unmount } = renderHook(() =>
+  it('keeps a single interval across re-renders and clears it on unmount', () => {
+    const { unmount, rerender } = renderHook(() =>
       useRotatingPlaceholder(NAMES, { paused: false, reducedMotion: false }),
     );
+    expect(vi.getTimerCount()).toBe(1);
+    rerender();
+    rerender();
     expect(vi.getTimerCount()).toBe(1);
     unmount();
     expect(vi.getTimerCount()).toBe(0);

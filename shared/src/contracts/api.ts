@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MonthFilterSchema, OrderSchema } from './order.js';
+import { MonthFilterSchema, PublicOrderSchema } from './order.js';
 
 export const HealthResponseSchema = z.object({
   status: z.literal('ok'),
@@ -34,7 +34,7 @@ export const MonthQuerySchema = z.object({
   month: MonthFilterSchema.default('all'),
 });
 
-/** Data-quality counts. They describe rows, never their contents. */
+/** Data-quality counts. They describe rows, never their contents. Internal: logs and sheet:check. */
 export const DataQualitySchema = z.object({
   rowsRead: z.number().int().nonnegative(),
   blankRows: z.number().int().nonnegative(),
@@ -51,10 +51,13 @@ export const DataFreshnessSchema = z.object({
   stale: z.boolean(),
 });
 
+/**
+ * GET /api/orders. Public: everything here is visible to anyone who can reach the API. Only the
+ * fields the website needs; the response schema strips anything else before it is sent.
+ */
 export const OrdersResponseSchema = z.object({
   month: MonthFilterSchema,
-  orders: z.array(OrderSchema),
-  quality: DataQualitySchema,
+  orders: z.array(PublicOrderSchema),
   freshness: DataFreshnessSchema,
 });
 export type OrdersResponse = z.infer<typeof OrdersResponseSchema>;

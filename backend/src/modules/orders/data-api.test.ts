@@ -39,13 +39,29 @@ const get = async (url: string, headers: Record<string, string> = {}) =>
   (app ?? (await start())).inject({ method: 'GET', url, headers });
 
 describe('GET /api/orders', () => {
-  it('returns contract-valid orders with the original item names', async () => {
+  it('returns only the public fields, with opaque IDs and the original item names', async () => {
     await start();
     const res = await get('/api/orders');
     expect(res.statusCode).toBe(200);
-    const body = OrdersResponseSchema.parse(res.json());
-    expect(body.orders.map((o) => o.orderId)).toEqual(['A1', 'A2', 'A3']);
-    expect(body.orders[1]?.items).toEqual([
+    const raw = res.json<Record<string, unknown> & { orders: Record<string, unknown>[] }>();
+    // Exactly these fields reach the browser: nothing else is serialised.
+    expect(Object.keys(raw).sort()).toEqual(['freshness', 'month', 'orders']);
+    for (const order of raw.orders) {
+      expect(Object.keys(order).sort()).toEqual([
+        'items',
+        'orderDate',
+        'orderId',
+        'restaurant',
+        'statusCategory',
+        'totalPaidPaise',
+      ]);
+    }
+    const body = OrdersResponseSchema.parse(raw);
+    // Opaque IDs, oldest first (A2 in August, then A1 and A3), never the Zomato order IDs.
+    expect(body.orders.map((o) => o.orderId)).toEqual(['o0001', 'o0002', 'o0003']);
+    expect(res.body).not.toMatch(/"A[123]"/);
+    expect(res.body).not.toMatch(/orderTime|"status"|quality|20:15/);
+    expect(body.orders[0]?.items).toEqual([
       { name: 'Idly [2 Ps]', quantity: 2 },
       { name: 'Vada', quantity: 1 },
     ]);
@@ -64,7 +80,7 @@ describe('GET /api/orders', () => {
   it('filters by month and validates the month parameter', async () => {
     await start();
     const august = OrdersResponseSchema.parse((await get('/api/orders?month=2026-08')).json());
-    expect(august.orders.map((o) => o.orderId)).toEqual(['A2']);
+    expect(august.orders.map((o) => o.orderId)).toEqual(['o0001']); // same ID as in the full list
     const bad = await get('/api/orders?month=August');
     expect(bad.statusCode).toBe(400);
     expect(bad.body).not.toContain('August');
@@ -156,5 +172,86 @@ describe('local-only access control', () => {
     await start();
     expect((await get('/api/orders', { 'sec-fetch-site': 'cross-site' })).statusCode).toBe(403);
     expect((await get('/api/orders', { 'sec-fetch-site': 'same-origin' })).statusCode).toBe(200);
+  });
+});
+
+describe('public deployment (production settings)', () => {
+  const PROD = {
+    NODE_ENV: 'production',
+    HOST: '0.0.0.0',
+    LOG_LEVEL: 'silent',
+    RENDER_EXTERNAL_HOSTNAME: 'my-api.onrender.com',
+    ALLOWED_HOSTS: 'my-site.onrender.com',
+    TRUST_PROXY_HOPS: '1',
+  };
+  const startProd = async (extra: Record<string, string> = {}) => {
+    app = await buildApp(loadEnv({ ...PROD, ...extra }), {
+      sheetsReader: { readValues: () => Promise.resolve(ROWS) },
+    });
+    return app;
+  };
+
+  it('answers under the Render service and static-site hostnames only', async () => {
+    await startProd();
+    for (const host of ['my-api.onrender.com', 'my-site.onrender.com', 'localhost:10000']) {
+      expect((await get('/api/orders', { host })).statusCode).toBe(200);
+    }
+    for (const host of ['evil.example', 'my-api.onrender.com.evil.example', '10.0.0.5:10000']) {
+      const res = await get('/api/orders', { host });
+      expect(res.statusCode).toBe(403);
+      expect(res.body).not.toContain('Imaginary Tandoor');
+    }
+  });
+
+  it('lets the platform health check through under any hostname, with no data', async () => {
+    await startProd();
+    const res = await get('/api/health', { host: '10.0.0.5:10000' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: 'ok' });
+  });
+
+  it('still refuses cross-site browser requests and keeps the security headers', async () => {
+    await startProd();
+    const crossSite = await get('/api/orders', {
+      host: 'my-api.onrender.com',
+      'sec-fetch-site': 'cross-site',
+    });
+    expect(crossSite.statusCode).toBe(403);
+    const res = await get('/api/orders', { host: 'my-site.onrender.com' });
+    expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('rate-limits per visitor behind one proxy hop, and a forged address does not help', async () => {
+    await startProd({ RATE_LIMIT_MAX: '2' });
+    // Render's proxy appends the real client address; a visitor may prepend a forged one.
+    const as = (forwarded: string) =>
+      get('/api/health', { host: 'my-api.onrender.com', 'x-forwarded-for': forwarded });
+    expect((await as('203.0.113.7')).statusCode).toBe(200);
+    expect((await as('1.1.1.1, 203.0.113.7')).statusCode).toBe(200);
+    expect((await as('2.2.2.2, 203.0.113.7')).statusCode).toBe(429); // same real visitor
+    expect((await as('198.51.100.9')).statusCode).toBe(200); // another visitor has their own limit
+  });
+
+  it('ignores X-Forwarded-For when no proxy is trusted (local default)', async () => {
+    app = await buildApp(loadEnv({ NODE_ENV: 'test', RATE_LIMIT_MAX: '2' }), {
+      sheetsReader: { readValues: () => Promise.resolve(ROWS) },
+    });
+    const as = (forwarded: string) => get('/api/health', { 'x-forwarded-for': forwarded });
+    expect((await as('203.0.113.1')).statusCode).toBe(200);
+    expect((await as('203.0.113.2')).statusCode).toBe(200);
+    expect((await as('203.0.113.3')).statusCode).toBe(429); // forging addresses doesn't reset it
+  });
+
+  it('serves the same public fields as locally, and validates input the same way', async () => {
+    await startProd();
+    const body = OrdersResponseSchema.parse(
+      (await get('/api/orders', { host: 'my-site.onrender.com' })).json(),
+    );
+    expect(body.orders.map((o) => o.orderId)).toEqual(['o0001', 'o0002', 'o0003']);
+    const bad = await get('/api/insights?month=2026-13', { host: 'my-site.onrender.com' });
+    expect(bad.statusCode).toBe(400);
+    expect(ApiErrorSchema.parse(bad.json()).message).toBe('Request validation failed');
   });
 });

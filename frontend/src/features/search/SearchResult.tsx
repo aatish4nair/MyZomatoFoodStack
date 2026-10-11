@@ -1,28 +1,24 @@
-import type { MonthFilter, SearchOutcome } from '@food-stack/shared';
+import type { MonthFilter, SearchOutcome, SearchSummary } from '@food-stack/shared';
 import { formatLongDate, formatMonth, formatRupees, plural } from './format';
 import { CalendarIcon, ClockIcon, PizzaSliceIcon } from './icons';
 
 const monthPhrase = (month: MonthFilter): string => (month === 'all' ? 'in total' : 'this month');
 
 /**
- * The left-hand result. It is a polite live region so screen readers hear the result as text;
- * the fade-in is only decoration. The panel fades in when a result first appears and then
- * updates in place while the user keeps typing (no restart on every keystroke).
+ * The left-hand result for a picked category or dish. It is a polite live region so screen readers
+ * hear the result as text; the fade-in is only decoration.
  */
 interface SearchResultProps {
   outcome: SearchOutcome;
-  /** Called with a food's display name when the user picks one of the suggested variants. */
-  onSelectVariant: (name: string) => void;
 }
 
-export function SearchResult({ outcome, onSelectVariant }: SearchResultProps) {
+export function SearchResult({ outcome }: SearchResultProps) {
   return (
     <section className="result" aria-live="polite" aria-label="Search result">
       {outcome.kind === 'match' && <MatchDetails outcome={outcome} />}
-      {outcome.kind === 'clarify' && <Clarify outcome={outcome} onSelect={onSelectVariant} />}
       {outcome.kind === 'none' && (
         <p className="result__empty reveal" key="none">
-          No orders for “{outcome.query}”{' '}
+          No orders for “{outcome.label}”{' '}
           {outcome.month === 'all' ? 'yet' : `in ${formatMonth(outcome.month)}`}.
         </p>
       )}
@@ -30,48 +26,8 @@ export function SearchResult({ outcome, onSelectVariant }: SearchResultProps) {
   );
 }
 
-/**
- * "Which biryani are you looking for?" followed by the real variants as buttons: reachable with Tab,
- * activated with Enter/Space, and large enough to tap on mobile. It never shows a result or a plate
- * itself, so the question is clearly separate from an actual result.
- */
-function Clarify({
-  outcome,
-  onSelect,
-}: {
-  outcome: Extract<SearchOutcome, { kind: 'clarify' }>;
-  onSelect: (name: string) => void;
-}) {
-  const question = `Which ${outcome.query.toLowerCase()} are you looking for?`;
-  return (
-    <div className="clarify reveal" key="clarify">
-      <p className="clarify__question" id="clarify-question">
-        {question}
-      </p>
-      <ul className="clarify__options" aria-labelledby="clarify-question">
-        {outcome.options.map((option) => (
-          <li key={option.name}>
-            <button
-              type="button"
-              className="clarify__option"
-              onClick={() => {
-                onSelect(option.name);
-              }}
-            >
-              {option.name}
-              <span className="visually-hidden">, {plural(option.orderCount, 'order')}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {outcome.moreCount > 0 && (
-        <p className="clarify__more">
-          {plural(outcome.moreCount, 'more match')}. Keep typing to narrow it down.
-        </p>
-      )}
-    </div>
-  );
-}
+/** How many variants a category result names before summarising the rest. */
+const MAX_LISTED_VARIANTS = 6;
 
 function MatchDetails({ outcome }: { outcome: Extract<SearchOutcome, { kind: 'match' }> }) {
   const { summary } = outcome;
@@ -86,15 +42,7 @@ function MatchDetails({ outcome }: { outcome: Extract<SearchOutcome, { kind: 'ma
         </span>
       </p>
       <h2 className="result__name">{summary.foodName}</h2>
-      <p className="result__paid">
-        {formatRupees(summary.totalPaidPaise)} <span className="result__paid-word">paid</span>
-        {summary.ordersMissingTotal > 0 && (
-          <span className="result__note">
-            {' '}
-            (amount missing for {plural(summary.ordersMissingTotal, 'order')})
-          </span>
-        )}
-      </p>
+      <Paid summary={summary} />
       <ul className="result__details">
         {summary.restaurant !== null && (
           <li>
@@ -118,8 +66,61 @@ function MatchDetails({ outcome }: { outcome: Extract<SearchOutcome, { kind: 'ma
           </span>
         </li>
       </ul>
+      <Breakdown summary={summary} />
     </div>
   );
+}
+
+/**
+ * The amount paid, from orders that contained only the picked category/dish. The sheet's Total
+ * Paid covers a whole order and there are no item prices, so orders that also had other dishes
+ * are left out of the amount and said so, rather than attributed.
+ */
+function Paid({ summary }: { summary: SearchSummary }) {
+  if (summary.pricedOrderCount === 0) {
+    return (
+      <p className="result__paid result__paid--unknown">
+        Amount not known
+        <span className="result__note">
+          {' '}
+          (
+          {summary.ordersWithOtherItems > 0
+            ? 'always ordered with other dishes; there are no item prices'
+            : 'amount missing'}
+          )
+        </span>
+      </p>
+    );
+  }
+  const notes = [
+    summary.ordersWithOtherItems > 0 &&
+      `excludes ${plural(summary.ordersWithOtherItems, 'order')} that also had other dishes`,
+    summary.ordersMissingTotal > 0 &&
+      `amount missing for ${plural(summary.ordersMissingTotal, 'order')}`,
+  ].filter(Boolean);
+  return (
+    <p className="result__paid">
+      {formatRupees(summary.totalPaidPaise)} <span className="result__paid-word">paid</span>
+      {notes.length > 0 && <span className="result__note"> ({notes.join('; ')})</span>}
+    </p>
+  );
+}
+
+/** Which dishes a category result covers, or the original names a single dish was ordered as. */
+function Breakdown({ summary }: { summary: SearchSummary }) {
+  if (summary.selection === 'category') {
+    const listed = summary.variants.slice(0, MAX_LISTED_VARIANTS);
+    const more = summary.variants.length - listed.length;
+    return (
+      <p className="result__variants">
+        Includes {listed.map((v) => `${v.name} (${plural(v.orderCount, 'order')})`).join(', ')}
+        {more > 0 ? ` and ${plural(more, 'more dish', 'more dishes')}` : ''}.
+      </p>
+    );
+  }
+  const names = summary.variants.flatMap((v) => v.originalNames);
+  if (names.length < 2) return null;
+  return <p className="result__variants">Ordered as {names.join(', ')}.</p>;
 }
 
 /** The hand-drawn red strokes either side of the count, as in the design. */

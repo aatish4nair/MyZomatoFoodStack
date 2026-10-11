@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OrdersResponseSchema } from './api.js';
-import { MonthFilterSchema, OrderSchema } from './order.js';
+import { MonthFilterSchema, OrderSchema, PublicOrderSchema } from './order.js';
 
 const valid = {
   orderId: '1234567890',
@@ -47,20 +47,41 @@ describe('OrderSchema', () => {
     expect(parsed).not.toHaveProperty('serialNumber');
   });
 
-  it('strips them from API responses too', () => {
+  it('keeps API responses to the public fields only', () => {
     const response = OrdersResponseSchema.parse({
       month: 'all',
-      orders: [{ ...valid, gmailMessageId: 'abc' }],
-      quality: {
-        rowsRead: 1,
-        blankRows: 0,
-        rejectedRows: 0,
-        ordersWithConflictingTotals: 0,
-        ordersMissingTotal: 0,
-      },
+      orders: [
+        {
+          ...valid,
+          orderId: 'o0001',
+          gmailMessageId: 'abc',
+          serialNumber: 7,
+        },
+      ],
+      quality: { rowsRead: 1 },
       freshness: { fetchedAt: '2026-10-10T00:00:00.000Z', stale: false },
     });
-    expect(JSON.stringify(response)).not.toContain('gmailMessageId');
+    expect(Object.keys(response).sort()).toEqual(['freshness', 'month', 'orders']);
+    expect(Object.keys(response.orders[0] ?? {}).sort()).toEqual([
+      'items',
+      'orderDate',
+      'orderId',
+      'restaurant',
+      'statusCategory',
+      'totalPaidPaise',
+    ]);
+    const json = JSON.stringify(response);
+    for (const hidden of ['gmailMessageId', 'serialNumber', 'orderTime', '"status"', 'quality']) {
+      expect(json).not.toContain(hidden);
+    }
+  });
+
+  it('accepts only opaque order IDs in public responses (never a Zomato order ID)', () => {
+    const order = { ...valid, orderId: 'o0042' };
+    expect(PublicOrderSchema.safeParse(order).success).toBe(true);
+    for (const id of [valid.orderId, '7123456789', 'o12', '']) {
+      expect(PublicOrderSchema.safeParse({ ...order, orderId: id }).success).toBe(false);
+    }
   });
 });
 

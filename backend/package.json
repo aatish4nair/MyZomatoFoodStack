@@ -10,7 +10,8 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
     "sheet:check": "tsx --conditions=source --env-file-if-exists=.env src/scripts/check-sheet.ts",
-    "art:coverage": "tsx --conditions=source --env-file-if-exists=.env src/scripts/art-coverage.ts"
+    "art:coverage": "tsx --conditions=source --env-file-if-exists=.env src/scripts/art-coverage.ts",
+    "dish:categories": "tsx --conditions=source --env-file-if-exists=.env src/scripts/dish-categories.ts"
   },
   "dependencies": {
     "@fastify/cors": "11.3.1",

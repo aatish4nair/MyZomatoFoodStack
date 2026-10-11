@@ -3,6 +3,16 @@ import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod';
 import type { ApiError } from '@food-stack/shared';
 import { DATA_ERROR_MESSAGES, DataUnavailableError } from '../lib/data-errors.js';
 
+const CLIENT_ERROR_MESSAGES: Readonly<Record<number, string>> = {
+  400: 'Bad request.',
+  404: 'Route not found.',
+  405: 'Method not allowed.',
+  406: 'Not acceptable.',
+  413: 'Request body too large.',
+  415: 'Unsupported media type.',
+  429: 'Too many requests. Please try again shortly.',
+};
+
 /**
  * Uniform, safe error responses: no stack traces, no echo of request input,
  * and a generic message for anything that is the server's fault.
@@ -43,10 +53,11 @@ export function registerErrorHandling(app: FastifyInstance): void {
       return reply.status(statusCode).send(body);
     }
 
+    // Fixed wording per status: framework messages can repeat parts of the request.
     const body: ApiError = {
       statusCode,
       error: statusCode === 429 ? 'Too Many Requests' : 'Request Error',
-      message: error.message,
+      message: CLIENT_ERROR_MESSAGES[statusCode] ?? 'The request could not be processed.',
     };
     return reply.status(statusCode).send(body);
   });

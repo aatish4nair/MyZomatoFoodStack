@@ -7,7 +7,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
-import { sheetsConfig, type Env } from './config/env.js';
+import { allowedHostnames, sheetsConfig, type Env } from './config/env.js';
 import {
   createSheetsReader,
   type SheetValuesReader,
@@ -31,15 +31,20 @@ export async function buildApp(env: Env, deps: AppDeps = {}): Promise<FastifyIns
   const app = Fastify({
     logger: loggerOptions(env),
     bodyLimit: 16 * 1024,
-    // Only trust X-Forwarded-* headers once a known reverse proxy is in front (deployment phase).
-    trustProxy: false,
+    // Trust X-Forwarded-For only for the configured number of proxy hops (0 locally), so the
+    // client address used for rate limiting can't be spoofed by a visitor.
+    // (Same as proxy-addr's numeric setting: trust the first N hops, counted from the server.)
+    trustProxy:
+      env.TRUST_PROXY_HOPS > 0
+        ? (_address: string, hop: number) => hop < env.TRUST_PROXY_HOPS
+        : false,
   }).withTypeProvider<ZodTypeProvider>();
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
   registerErrorHandling(app);
-  registerLocalOnly(app);
+  registerLocalOnly(app, allowedHostnames(env));
 
   // The API only serves JSON, so its CSP denies everything.
   await app.register(helmet, {

@@ -30,5 +30,23 @@ const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric',
 export const formatMonth = (yearMonth: string): string =>
   MONTH.format(new Date(`${yearMonth}-01T00:00:00Z`));
 
-export const plural = (count: number, word: string): string =>
-  `${String(count)} ${word}${count === 1 ? '' : 's'}`;
+export interface YearGroup {
+  year: string;
+  /** "YYYY-MM" values, newest month first (December → January). */
+  months: string[];
+}
+
+/** Groups "YYYY-MM" months by year: latest year first, newest month first within a year. */
+export function groupMonthsByYear(months: readonly string[]): YearGroup[] {
+  const byYear = new Map<string, string[]>();
+  for (const month of [...new Set(months)].sort().reverse()) {
+    const year = month.slice(0, 4);
+    byYear.set(year, [...(byYear.get(year) ?? []), month]);
+  }
+  return [...byYear]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([year, list]) => ({ year, months: list }));
+}
+
+export const plural = (count: number, word: string, pluralWord = `${word}s`): string =>
+  `${String(count)} ${count === 1 ? word : pluralWord}`;

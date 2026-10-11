@@ -2,7 +2,7 @@ import {
   ApiErrorSchema,
   OrdersResponseSchema,
   type DataErrorCode,
-  type Order,
+  type PublicOrder as Order,
 } from '@food-stack/shared';
 
 /**

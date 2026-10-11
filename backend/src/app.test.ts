@@ -86,4 +86,29 @@ describe('error handling', () => {
     expect(res.body).not.toContain('stack');
     expect(ApiErrorSchema.parse(res.json()).message).toBe('Something went wrong');
   });
+
+  it('answers client errors with fixed wording, never repeating request details', async () => {
+    const server = await makeApp();
+    server.get('/api/too-big', () => {
+      throw Object.assign(
+        new Error('Body of 99999 bytes from <script>alert(1)</script> rejected'),
+        {
+          statusCode: 413,
+        },
+      );
+    });
+    const res = await server.inject({ method: 'GET', url: '/api/too-big' });
+    expect(res.statusCode).toBe(413);
+    expect(res.body).not.toContain('script');
+    expect(res.body).not.toContain('99999');
+    expect(ApiErrorSchema.parse(res.json()).message).toBe('Request body too large.');
+  });
+
+  it('rejects other methods and unknown routes with a generic JSON error', async () => {
+    const server = await makeApp();
+    const post = await server.inject({ method: 'POST', url: '/api/orders', payload: { a: 1 } });
+    expect(post.statusCode).toBe(404);
+    expect(post.body).not.toContain('"a"');
+    expect(ApiErrorSchema.parse(post.json()).message).toBe('Route not found');
+  });
 });

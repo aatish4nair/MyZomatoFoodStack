@@ -1,35 +1,15 @@
-import type { MonthFilter, Order, OrderItem } from '../contracts/order.js';
+import type { MonthFilter, OrderItem, SearchableOrder } from '../contracts/order.js';
 import type { SearchSummary } from '../contracts/insights.js';
-import { toDisplayName } from './display-name.js';
+import { foodNameKey, toDisplayName } from './display-name.js';
+
+export { foodNameKey };
 import { isCountedOrder } from './order-status.js';
-
-/** One food the user might mean: a distinct display name, with how many orders contain it. */
-export interface VariantOption {
-  name: string;
-  orderCount: number;
-}
-
-/** At most this many variants are offered at once; the rest are summarised as "more". */
-export const MAX_VARIANT_OPTIONS = 8;
-
-export type SearchOutcome =
-  | { kind: 'idle' }
-  | { kind: 'none'; query: string; month: MonthFilter }
-  | {
-      kind: 'clarify';
-      query: string;
-      month: MonthFilter;
-      /** Most-ordered first. */
-      options: VariantOption[];
-      /** Matching variants not listed (the user can type more to narrow down). */
-      moreCount: number;
-    }
-  | {
-      kind: 'match';
-      summary: SearchSummary;
-      /** The most recent matching order and the matching item in it (original name intact). */
-      representative: { order: Order; item: OrderItem };
-    };
+import {
+  CATEGORY_SEARCH_TERMS,
+  categorizeDish,
+  dishTypeOf,
+  type DishCategory,
+} from './dish-category.js';
 
 const words = (text: string): string[] =>
   text
@@ -49,129 +29,260 @@ export function matchesQuery(itemName: string, query: string): boolean {
   return queryWords.every((q) => nameWords.some((w) => w.startsWith(q)));
 }
 
-export function inMonth(order: Pick<Order, 'orderDate'>, month: MonthFilter): boolean {
+export function inMonth(order: Pick<SearchableOrder, 'orderDate'>, month: MonthFilter): boolean {
   return month === 'all' || order.orderDate.startsWith(`${month}-`);
 }
 
 /** Months that have counted orders, newest first, as `YYYY-MM`. */
-export function listMonths(orders: readonly Order[]): string[] {
+export function listMonths(orders: readonly SearchableOrder[]): string[] {
   return [...new Set(orders.filter(isCountedOrder).map((o) => o.orderDate.slice(0, 7)))]
     .sort()
     .reverse();
 }
 
-const newestFirst = (a: Order, b: Order): number =>
-  `${b.orderDate} ${b.orderTime ?? ''}`.localeCompare(`${a.orderDate} ${a.orderTime ?? ''}`) ||
-  a.orderId.localeCompare(b.orderId);
-
-/** The food as shown to the user: the original name without bracketed text. */
-const displayNameOf = (item: OrderItem): string => toDisplayName(item.name) || item.name;
-
 /**
- * Identity of a (display) food name, ignoring case, punctuation, "&" vs "and" and word order:
- * "Chicken Tandoori" ≡ "Tandoori Chicken" ≡ "tandoori-chicken". Used to group variants and to match
- * plate image files to dishes.
+ * Newest first: by date, then by ID. Public order IDs are assigned oldest → newest, so on the same
+ * day the later order comes first without the API exposing the time of day.
  */
-export const foodNameKey = (name: string): string =>
-  words(name.replace(/&/g, ' and ')).sort().join(' ');
-const variantKey = foodNameKey;
+const newestFirst = (a: SearchableOrder, b: SearchableOrder): number =>
+  b.orderDate.localeCompare(a.orderDate) ||
+  b.orderId.localeCompare(a.orderId, 'en', { numeric: true });
 
-const countedIn = (orders: readonly Order[], month: MonthFilter): Order[] =>
+const countedIn = (orders: readonly SearchableOrder[], month: MonthFilter): SearchableOrder[] =>
   orders.filter((o) => isCountedOrder(o) && inMonth(o, month));
 
-/**
- * The distinct foods (by display name, brackets removed) whose ORIGINAL name matches the query,
- * among counted orders in the month. "Chicken Biryani (Serves 1)" and "Chicken Biryani [Boneless]"
- * are the same food. Most-ordered first, then A→Z.
- */
-export function findVariants(
-  orders: readonly Order[],
-  query: string,
-  month: MonthFilter,
-): VariantOption[] {
-  const variants = new Map<string, { name: string; orderIds: Set<string> }>();
+/** What the user picked from the suggestions: a whole category, or one dish (Dish Type). */
+export type SearchSelection =
+  { kind: 'category'; category: DishCategory } | { kind: 'dish'; key: string; name: string };
+
+/** One autocomplete suggestion. Typing never selects one; the user picks it explicitly. */
+export type Suggestion =
+  | {
+      kind: 'category';
+      category: DishCategory;
+      /** "Biryani · All variants" */
+      label: string;
+      dishCount: number;
+      orderCount: number;
+    }
+  | { kind: 'dish'; key: string; name: string; category: DishCategory; orderCount: number };
+
+export const MAX_CATEGORY_SUGGESTIONS = 3;
+export const MAX_DISH_SUGGESTIONS = 8;
+
+export const categoryLabel = (category: DishCategory): string => `${category} · All variants`;
+
+/** True when every word typed starts a word of the category's name or one of its search terms. */
+function categoryMatches(category: DishCategory, query: string): boolean {
+  const queryWords = words(query);
+  if (queryWords.length === 0) return false;
+  const vocabulary = [category, ...(CATEGORY_SEARCH_TERMS[category] ?? [])].flatMap(words);
+  return queryWords.every((q) => vocabulary.some((w) => w.startsWith(q)));
+}
+
+interface DishStats {
+  key: string;
+  name: string;
+  category: DishCategory;
+  orderIds: Set<string>;
+}
+
+/** Dishes (Dish Types) in the counted orders of the month, with the orders that contain them. */
+function dishesIn(orders: readonly SearchableOrder[], month: MonthFilter): Map<string, DishStats> {
+  const dishes = new Map<string, DishStats>();
   for (const order of countedIn(orders, month)) {
     for (const item of order.items) {
-      if (!matchesQuery(item.name, query)) continue;
-      const name = displayNameOf(item);
-      const key = variantKey(name);
-      const entry = variants.get(key) ?? { name, orderIds: new Set<string>() };
+      const { key, name } = dishTypeOf(item.name);
+      const entry = dishes.get(key) ?? {
+        key,
+        name,
+        category: categorizeDish(item.name),
+        orderIds: new Set<string>(),
+      };
       entry.orderIds.add(order.orderId);
+      dishes.set(key, entry);
+    }
+  }
+  return dishes;
+}
+
+const byOrdersThenName = (
+  a: { orderCount: number; name: string },
+  b: { orderCount: number; name: string },
+): number => b.orderCount - a.orderCount || a.name.localeCompare(b.name);
+
+/**
+ * Autocomplete for what the user has typed, within the selected month (or all months):
+ * - categories whose name or search terms match ("bir" → "Biryani · All variants"), first;
+ * - then individual dishes whose ORIGINAL item name matches word by word (`matchesQuery`), one
+ *   entry per Dish Type, so pack sizes, brackets, case and word order don't create duplicates.
+ * Only foods that were actually ordered in the range are offered. Most-ordered first.
+ */
+export function suggest(
+  orders: readonly SearchableOrder[],
+  query: string,
+  month: MonthFilter,
+): Suggestion[] {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const dishes = dishesIn(orders, month);
+  const matchingKeys = new Set<string>();
+  for (const order of countedIn(orders, month)) {
+    for (const item of order.items) {
+      if (matchesQuery(item.name, trimmed)) matchingKeys.add(dishTypeOf(item.name).key);
+    }
+  }
+
+  const categories = new Map<DishCategory, { dishes: number; orderIds: Set<string> }>();
+  for (const dish of dishes.values()) {
+    const entry = categories.get(dish.category) ?? { dishes: 0, orderIds: new Set<string>() };
+    entry.dishes++;
+    for (const id of dish.orderIds) entry.orderIds.add(id);
+    categories.set(dish.category, entry);
+  }
+  const categorySuggestions: Suggestion[] = [...categories]
+    .filter(([category]) => category !== 'Other' && categoryMatches(category, trimmed))
+    .map(([category, entry]) => ({
+      kind: 'category' as const,
+      category,
+      label: categoryLabel(category),
+      dishCount: entry.dishes,
+      orderCount: entry.orderIds.size,
+    }))
+    .sort((a, b) => byOrdersThenName({ ...a, name: a.label }, { ...b, name: b.label }))
+    .slice(0, MAX_CATEGORY_SUGGESTIONS);
+
+  const dishSuggestions: Suggestion[] = [...dishes.values()]
+    .filter((dish) => matchingKeys.has(dish.key))
+    .map((dish) => ({
+      kind: 'dish' as const,
+      key: dish.key,
+      name: dish.name,
+      category: dish.category,
+      orderCount: dish.orderIds.size,
+    }))
+    .sort(byOrdersThenName)
+    .slice(0, MAX_DISH_SUGGESTIONS);
+
+  return [...categorySuggestions, ...dishSuggestions];
+}
+
+export const selectionOf = (suggestion: Suggestion): SearchSelection =>
+  suggestion.kind === 'category'
+    ? { kind: 'category', category: suggestion.category }
+    : { kind: 'dish', key: suggestion.key, name: suggestion.name };
+
+/** Text shown in the search field once a suggestion is picked. */
+export const selectionText = (selection: SearchSelection): string =>
+  selection.kind === 'category' ? selection.category : selection.name;
+
+export type SearchOutcome =
+  | { kind: 'idle' }
+  | { kind: 'none'; label: string; month: MonthFilter }
+  | {
+      kind: 'match';
+      summary: SearchSummary;
+      /** The item whose picture represents the result (original name intact). */
+      representative: { order: SearchableOrder; item: OrderItem };
+    };
+
+const belongsTo = (selection: SearchSelection) =>
+  selection.kind === 'dish'
+    ? (item: OrderItem) => dishTypeOf(item.name).key === selection.key
+    : (item: OrderItem) => categorizeDish(item.name) === selection.category;
+
+/**
+ * Results for a picked category or dish, among counted orders in the month (or all months):
+ * - every order containing it is counted once (by order ID);
+ * - the quantity is the sum over the matching items (null if any quantity is unknown);
+ * - the amount uses ONLY orders in which every item belongs to the selection. The sheet's Total
+ *   Paid covers the whole order and there are no item prices, so an order that also contains
+ *   other dishes is counted but its amount is left out (and reported), never attributed;
+ * - the most recent order supplies the restaurant and date; `variants` breaks the result down by
+ *   dish, with the original item names behind each.
+ * A category's picture comes from its most-ordered dish; a dish's from its most recent order.
+ */
+export function searchSelection(
+  orders: readonly SearchableOrder[],
+  selection: SearchSelection,
+  month: MonthFilter,
+): SearchOutcome {
+  const belongs = belongsTo(selection);
+  const hits = countedIn(orders, month)
+    .map((order) => ({ order, items: order.items.filter(belongs) }))
+    .filter((hit) => hit.items.length > 0)
+    .sort((a, b) => newestFirst(a.order, b.order));
+  const label = selection.kind === 'category' ? selection.category : selection.name;
+  const first = hits[0];
+  if (!first) return { kind: 'none', label, month };
+
+  const variants = new Map<
+    string,
+    {
+      name: string;
+      orderIds: Set<string>;
+      quantities: (number | null)[];
+      originalNames: Set<string>;
+      latest: { order: SearchableOrder; item: OrderItem };
+    }
+  >();
+  for (const hit of hits) {
+    for (const item of hit.items) {
+      const { key, name } = dishTypeOf(item.name);
+      const entry = variants.get(key) ?? {
+        name,
+        orderIds: new Set<string>(),
+        quantities: [],
+        originalNames: new Set<string>(),
+        latest: { order: hit.order, item }, // hits are newest first
+      };
+      entry.orderIds.add(hit.order.orderId);
+      entry.quantities.push(item.quantity);
+      entry.originalNames.add(item.name);
       variants.set(key, entry);
     }
   }
-  return [...variants.values()]
-    .map((v) => ({ name: v.name, orderCount: v.orderIds.size }))
-    .sort((a, b) => b.orderCount - a.orderCount || a.name.localeCompare(b.name));
-}
+  const sum = (values: readonly (number | null)[]): number | null => {
+    let total = 0;
+    for (const quantity of values) {
+      if (quantity === null) return null; // one unknown quantity makes the total unknown
+      total += quantity;
+    }
+    return total;
+  };
+  const variantList = [...variants.values()]
+    .map((v) => ({ ...v, orderCount: v.orderIds.size }))
+    .sort(byOrdersThenName);
 
-/**
- * Resolves what the user typed:
- * - no matching food → `none`;
- * - the words typed are exactly one food's name (any word order, e.g. "chicken tandoori"), or only
- *   one food matches → `match` for that food;
- * - several foods match a more generic query (e.g. "biryani" → Chicken / Mutton / Veg Biryani) →
- *   `clarify`, offering the real variants from the order data.
- *
- * A match covers one food only. Orders are counted once each (by order ID). The amount is the sum
- * of those orders' totals; the sheet has no per-item prices, so an order's total includes any
- * other items in it. The most recent order supplies the restaurant and date.
- */
-export function searchOrders(
-  orders: readonly Order[],
-  query: string,
-  month: MonthFilter,
-): SearchOutcome {
-  const trimmed = query.trim();
-  if (!trimmed) return { kind: 'idle' };
-
-  const variants = findVariants(orders, trimmed, month);
-  if (variants.length === 0) return { kind: 'none', query: trimmed, month };
-  const typedKey = variantKey(trimmed);
-  const chosen =
-    variants.find((v) => variantKey(v.name) === typedKey) ??
-    (variants.length === 1 ? variants[0] : undefined);
-  if (!chosen) {
-    return {
-      kind: 'clarify',
-      query: trimmed,
-      month,
-      options: variants.slice(0, MAX_VARIANT_OPTIONS),
-      moreCount: Math.max(0, variants.length - MAX_VARIANT_OPTIONS),
-    };
-  }
-
-  const chosenKey = variantKey(chosen.name);
-  const hits = countedIn(orders, month)
-    .map((order) => ({
-      order,
-      items: order.items.filter((i) => variantKey(displayNameOf(i)) === chosenKey),
-    }))
-    .filter((hit) => hit.items.length > 0)
-    .sort((a, b) => newestFirst(a.order, b.order));
-
-  const first = hits[0];
-  const firstItem = first?.items[0];
-  if (!first || !firstItem) return { kind: 'none', query: trimmed, month };
-
-  const quantities = hits.flatMap((h) => h.items).map((i) => i.quantity);
-  const known = hits.filter((h) => h.order.totalPaidPaise !== null);
+  const exclusive = hits.filter((hit) => hit.items.length === hit.order.items.length);
+  const priced = exclusive.filter((hit) => hit.order.totalPaidPaise !== null);
+  const representative =
+    selection.kind === 'category'
+      ? (variantList[0]?.latest ?? { order: first.order, item: first.items[0] as OrderItem })
+      : { order: first.order, item: first.items[0] as OrderItem };
 
   return {
     kind: 'match',
-    representative: { order: first.order, item: firstItem },
+    representative,
     summary: {
-      query: trimmed,
+      query: label,
       month,
+      selection: selection.kind,
       matchingOrderCount: hits.length,
-      foodName: chosen.name,
-      totalPaidPaise: known.reduce((sum, h) => sum + (h.order.totalPaidPaise ?? 0), 0),
-      ordersMissingTotal: hits.length - known.length,
+      foodName: selection.kind === 'category' ? categoryLabel(selection.category) : selection.name,
+      totalPaidPaise: priced.reduce((total, hit) => total + (hit.order.totalPaidPaise ?? 0), 0),
+      pricedOrderCount: priced.length,
+      ordersMissingTotal: exclusive.length - priced.length,
+      ordersWithOtherItems: hits.length - exclusive.length,
       restaurant: first.order.restaurant,
       orderDate: first.order.orderDate,
-      totalQuantity: quantities.every((q) => q !== null)
-        ? quantities.reduce((sum, q) => sum + q, 0)
-        : null,
+      totalQuantity: sum(hits.flatMap((hit) => hit.items.map((item) => item.quantity))),
+      variants: variantList.map((v) => ({
+        name: v.name,
+        orderCount: v.orderCount,
+        quantity: sum(v.quantities),
+        originalNames: [...v.originalNames].sort(),
+      })),
     },
   };
 }
@@ -180,7 +291,7 @@ export function searchOrders(
  * Food names for the animated search placeholder: display names (brackets removed) from counted
  * orders, without duplicates, most-ordered first. The original data is not modified.
  */
-export function placeholderNames(orders: readonly Order[]): string[] {
+export function placeholderNames(orders: readonly SearchableOrder[]): string[] {
   const counts = new Map<string, { name: string; count: number }>();
   for (const order of orders) {
     if (!isCountedOrder(order)) continue;

@@ -47,8 +47,10 @@ npm run dev:frontend          # http://127.0.0.1:5173
 
 - **Opening drop:** refresh the page. Food falls, settles along the bottom, then the interface
   fades in.
-- **Placeholder:** leave the search empty and unfocused; a food name changes every second. Click
-  into the field and it pauses.
+- **Placeholder:** leave the search empty; a food name changes about every 1.8 seconds. Type and
+  it pauses; clear the field and it resumes.
+- **Focus (mouse/trackpad):** the search field is focused when the page appears; click the title or
+  blank space, or pick a month with the mouse, and you can type straight away.
 - **Search:** try `tandoori`, `chicken tandoori`, `idly`, `momos`, `pizza`, then switch months.
   `sushi` shows the no-match state.
 - **Reduced motion:** turn on macOS _System Settings → Accessibility → Display → Reduce motion_

@@ -50,3 +50,29 @@ export const OrderSchema = z.object({
   items: z.array(OrderItemSchema).min(1),
 });
 export type Order = z.infer<typeof OrderSchema>;
+
+/**
+ * An order as served by the public API: only the fields the website uses. Compared with `Order`
+ * (the backend's internal record) it leaves out the Zomato order ID (replaced by an opaque ID),
+ * the time of day and the raw status text.
+ */
+export const PublicOrderSchema = z.object({
+  /**
+   * Opaque ID ("o0001", "o0002", …), unique within one response and assigned oldest → newest, so
+   * comparing two IDs orders same-day orders. It is not the Zomato order ID and can't be mapped
+   * back to it.
+   */
+  orderId: z.string().regex(/^o\d{4,}$/, 'Expected an opaque order ID'),
+  orderDate: z.iso.date(),
+  restaurant: z.string().min(1),
+  totalPaidPaise: z.number().int().nonnegative().nullable(),
+  statusCategory: StatusCategorySchema,
+  items: z.array(OrderItemSchema).min(1),
+});
+export type PublicOrder = z.infer<typeof PublicOrderSchema>;
+
+/** What search and display code needs from an order (both `Order` and `PublicOrder` qualify). */
+export type SearchableOrder = Pick<
+  PublicOrder,
+  'orderId' | 'orderDate' | 'restaurant' | 'totalPaidPaise' | 'statusCategory' | 'items'
+>;

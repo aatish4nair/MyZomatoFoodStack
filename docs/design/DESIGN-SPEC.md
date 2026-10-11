@@ -18,8 +18,8 @@ screenshots side by side.
 ## Elements
 
 - **Background:** warm off-white (≈ `#FBF8F3`).
-- **Title:** "My **Zomato** food Stack". Heavy, rounded geometric sans-serif (~44 px, tight letter
-  spacing). "My" and "food Stack" are near-black; "Zomato" is Zomato red (≈ `#E23744`).
+- **Title:** "My **Zomato** food stack". Heavy, rounded geometric sans-serif (~44 px, tight letter
+  spacing). "My" and "food stack" are near-black; "Zomato" is Zomato red (≈ `#E23744`).
 - **Month selector:** pill (fully rounded), pale pink fill (≈ `#FCE8E6`), dark text
   "September 2026", chevron-down on the right. It sits on the same baseline row as the title.
 - **Search input:** large, light-weight text (~36 px), near-black. Red caret. 1–2 px dark
@@ -46,13 +46,13 @@ screenshots side by side.
 
 ## States
 
-| State                              | Left column                                                        | Right side                             |
-| ---------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
-| Loading / opening drop             | Hidden until the drop has settled                                  | Empty                                  |
-| No search                          | Search with animated placeholder                                   | **Empty**                              |
-| Generic query, several foods match | “Which biryani are you looking for?” + one button per real variant | **Empty** (a question is not a result) |
-| Search with matches                | Count, name, amount, details                                       | One plate (or a neutral empty plate)   |
-| Search with no matches             | One quiet line: No orders for “…” in {Month}.                      | **Empty**, never an unrelated plate    |
+| State                       | Left column                                              | Right side                           |
+| --------------------------- | -------------------------------------------------------- | ------------------------------------ |
+| Loading / opening drop      | Hidden until the drop has settled                        | Empty                                |
+| No search                   | Search with animated placeholder                         | **Empty**                            |
+| Typing (nothing picked yet) | Suggestion list under the field: categories, then dishes | **Empty** (typing never selects)     |
+| Category or dish picked     | Count, name, amount, details, breakdown                  | One plate (or a neutral empty plate) |
+| Search with no matches      | One quiet line: No orders for “…” in {Month}.            | **Empty**, never an unrelated plate  |
 
 ## Decisions made in Phase 1
 
@@ -60,13 +60,18 @@ screenshots side by side.
 - **Several matching orders:** the **most recent** matching line supplies the food name, restaurant
   and date. The count is the number of distinct orders; amount and quantity are totals for the
   selected month.
-- **Month selector:** defaults to the latest month that has orders; "All months" is the last option.
+- **Month selector:** defaults to **All Months**, the first option. Below a divider, months that have
+  orders are grouped by year (latest year first), newest month first within each year, with a
+  divider between years.
 - **Matching:** every typed word must match the start of a word in the item name, in any order
   ("chicken tandoori" finds "Tandoori Chicken"; "lassi" does not find "Classic").
-- **Variants (Phase 2 refinement):** a food is a distinct display name ("Chicken Biryani (Serves 1)"
-  ≡ "Chicken Biryani"). If the typed words exactly name one food (any order), or only one food
-  matches, the result is shown directly. Otherwise the question lists up to 8 variants from the
-  selected month, most-ordered first, with "N more matches. Keep typing…" for the rest. Picking a
-  variant fills the search field with its name and returns focus there.
+- **Autocomplete (replaces the "Which biryani…?" question):** typing lists suggestions under the
+  field: up to 3 matching categories ("Biryani · All variants") first, then up to 8 dishes, from the
+  selected month, most-ordered first. Nothing is selected until the user clicks/taps one, or
+  highlights one with ↓/↑ and presses Enter. Escape closes the list (a second Escape clears).
+- **Category result:** heading "Biryani · All variants", every variant in the selected range, the
+  picture of the most-ordered dish, and an "Includes …" line listing the variants.
+- **Amount:** only orders made up entirely of the picked category/dish are priced; orders that also
+  contain other dishes are counted but left out of the amount, with a note.
 - **Mobile (≤ 760 px):** a single column; the plate sits below the result details; the pile stays
   at the bottom of the page.

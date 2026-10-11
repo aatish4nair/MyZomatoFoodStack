@@ -25,8 +25,32 @@ function isOrigin(value: string): boolean {
   }
 }
 
-/** Hosts the API may bind to. Phase 2 is local-only: anything else refuses to start. */
+/** Hosts the API may bind to by default: this computer only. */
 export const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'] as const;
+
+/**
+ * "All interfaces", as a hosting platform such as Render requires. Accepted ONLY with
+ * NODE_ENV=production and an explicit list of hostnames the API answers to (see superRefine).
+ */
+export const PUBLIC_BIND_HOSTS = ['0.0.0.0', '::'] as const;
+
+/** A bare hostname such as my-api.onrender.com (no scheme, port or path). */
+const HOSTNAME =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
+
+const hostnameList = z
+  .string()
+  .transform((value) =>
+    value
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  .pipe(
+    z.array(
+      z.string().regex(HOSTNAME, 'Each entry must be a bare hostname like my-api.onrender.com'),
+    ),
+  );
 
 const optionalText = z
   .string()
@@ -42,9 +66,23 @@ const EnvSchema = z
       .min(1)
       .default('127.0.0.1')
       .refine(
-        (host) => (LOOPBACK_HOSTS as readonly string[]).includes(host),
-        'Must be 127.0.0.1, ::1 or localhost: the API holds personal data and is local-only until access control for deployment exists',
+        (host) => ([...LOOPBACK_HOSTS, ...PUBLIC_BIND_HOSTS] as readonly string[]).includes(host),
+        'Must be 127.0.0.1, ::1 or localhost (or 0.0.0.0 / :: for a production deployment)',
       ),
+    /**
+     * Hostnames (besides localhost) the API answers to, e.g. the Render service and static-site
+     * hostnames. Requests addressed to any other hostname are refused.
+     */
+    ALLOWED_HOSTS: hostnameList.default([]),
+    /** Set automatically by Render to the service's public hostname; added to ALLOWED_HOSTS. */
+    RENDER_EXTERNAL_HOSTNAME: optionalText.pipe(
+      z.string().toLowerCase().regex(HOSTNAME, 'Expected a bare hostname').optional(),
+    ),
+    /**
+     * How many reverse proxies in front of the API to trust for the client address
+     * (X-Forwarded-For), so rate limiting applies per visitor. 0 = trust none (local default).
+     */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -85,6 +123,32 @@ const EnvSchema = z
     SHEET_MAX_ROWS: z.coerce.number().int().min(1).max(100_000).default(20_000),
   })
   .superRefine((env, ctx) => {
+    const publicBind = (PUBLIC_BIND_HOSTS as readonly string[]).includes(env.HOST);
+    if (publicBind && env.NODE_ENV !== 'production') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['HOST'],
+        message: `${env.HOST} is only allowed with NODE_ENV=production; use 127.0.0.1 for local development`,
+      });
+    }
+    if (
+      publicBind &&
+      env.ALLOWED_HOSTS.length === 0 &&
+      env.RENDER_EXTERNAL_HOSTNAME === undefined
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ALLOWED_HOSTS'],
+        message: `HOST=${env.HOST} needs ALLOWED_HOSTS (or Render's RENDER_EXTERNAL_HOSTNAME): the hostnames the API answers to`,
+      });
+    }
+    if (env.TRUST_PROXY_HOPS > 0 && env.NODE_ENV !== 'production') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TRUST_PROXY_HOPS'],
+        message: 'Only trust proxy headers in production, behind a known proxy',
+      });
+    }
     const credentialCount =
       Number(env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE !== undefined) +
       Number(env.GOOGLE_SERVICE_ACCOUNT_JSON !== undefined);
@@ -139,6 +203,22 @@ export interface SheetsConfig {
   timeoutMs: number;
   cacheTtlMs: number;
   maxRows: number;
+}
+
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+/**
+ * Hostnames requests may be addressed to (Host header): always localhost, plus ALLOWED_HOSTS and
+ * Render's own service hostname. Anything else is refused (see middleware/local-only.ts).
+ */
+export function allowedHostnames(env: Env): string[] {
+  return [
+    ...new Set([
+      ...LOCAL_HOSTNAMES,
+      ...env.ALLOWED_HOSTS,
+      ...(env.RENDER_EXTERNAL_HOSTNAME ? [env.RENDER_EXTERNAL_HOSTNAME] : []),
+    ]),
+  ];
 }
 
 /** The Google Sheets settings, or null when the data source is not configured at all. */

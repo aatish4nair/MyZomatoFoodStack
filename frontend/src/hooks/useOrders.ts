@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Order } from '@food-stack/shared';
+import type { PublicOrder as Order } from '@food-stack/shared';
 import type { OrderSource } from '../services/order-source';
 
 export type OrdersState =

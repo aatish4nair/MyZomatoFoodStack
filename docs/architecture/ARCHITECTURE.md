@@ -21,8 +21,10 @@ Status markers: **[built]** exists and is tested · **[planned]** designed here,
 ```
 
 - The **browser is untrusted**. It never receives Google credentials, the spreadsheet ID, Gmail
-  message IDs or sheet row numbers. It does receive the validated orders it needs to search
-  (from `/api/orders`), which is why the API is local-only (see the security model).
+  message IDs, sheet row numbers, Zomato order IDs or order times. It receives only the public
+  order fields it needs to search (from `/api/orders`). Locally the API answers only to
+  `localhost`; in the public Render deployment those fields are intentionally public
+  ([ADR-0003](ADR-0003-public-deployment-on-render.md), security model §5).
 - The **backend is the only component that talks to Google**.
 - The existing **Apps Script import stays exactly as it is**. This project only reads the sheet.
 
@@ -40,10 +42,11 @@ Status markers: **[built]** exists and is tested · **[planned]** designed here,
 backend/src/
 ├── server.ts                          starts the process (reads env, listens, graceful shutdown)
 ├── app.ts                             buildApp(env, deps): plugins, guards, routes; used by tests
-├── config/env.ts                      Zod-validated environment (incl. loopback-only HOST, Google settings)
+├── config/env.ts                      Zod-validated environment: HOST (loopback by default; 0.0.0.0 only in production
+│                                      with ALLOWED_HOSTS), allowed hostnames, TRUST_PROXY_HOPS, Google settings
 ├── integrations/google-sheets/        the ONLY code that talks to Google (read-only values.get)
 ├── lib/                               logger rules, safe data-error codes and messages
-├── middleware/                        error handler, local-only guard (Host + Sec-Fetch-Site, no-store)
+├── middleware/                        error handler, request guard (Host allow-list + Sec-Fetch-Site, no-store)
 ├── modules/health/                    GET /api/health
 ├── modules/orders/                    sheet cell parsers, sheet → orders parser, cached repository, GET /api/orders
 ├── modules/insights/                  the four metrics, GET /api/insights
@@ -113,11 +116,11 @@ Search and matching are pure functions in `shared/src/lib/` (`food-search.ts`,
 
 ## 4. API boundary
 
-| Method | Path                               | Response                                                                   |
-| ------ | ---------------------------------- | -------------------------------------------------------------------------- |
-| GET    | `/api/health`                      | `HealthResponse` → `{"status":"ok"}` (no configuration details)            |
-| GET    | `/api/orders?month=all\|YYYY-MM`   | `OrdersResponse`: `orders`, `quality` counts, `freshness`                  |
-| GET    | `/api/insights?month=all\|YYYY-MM` | `Insights`: the four metrics + `basis` + `freshness` (not shown in the UI) |
+| Method | Path                               | Response                                                                     |
+| ------ | ---------------------------------- | ---------------------------------------------------------------------------- |
+| GET    | `/api/health`                      | `HealthResponse` → `{"status":"ok"}` (no configuration details)              |
+| GET    | `/api/orders?month=all\|YYYY-MM`   | `OrdersResponse`: `month`, `orders` (public fields only, below), `freshness` |
+| GET    | `/api/insights?month=all\|YYYY-MM` | `Insights`: the four metrics + `basis` + `freshness` (not shown in the UI)   |
 
 Why these two data endpoints: the page needs every month (for the month pill and instant,
 offline-feeling search), so one `/api/orders` read serves it; a per-keystroke search endpoint would
@@ -134,8 +137,16 @@ Rules for every endpoint:
   `UPSTREAM_TIMEOUT`, `UPSTREAM_ERROR`, `MALFORMED_SHEET`). Google's raw errors are never forwarded
   or logged.
 - All `/api` responses send `Cache-Control: no-store`.
-- Local-only guard: Host must be localhost, and cross-site browser requests are refused (see the
-  security model §5).
+- **Public order fields** (`PublicOrder`, built by `toPublicOrders` in `shared/`): an opaque
+  `orderId` (`o0001`…, assigned oldest → newest; never the Zomato order ID), `orderDate`,
+  `restaurant`, `totalPaidPaise`, `statusCategory` and `items` (`name`, `quantity`). The order
+  time, raw status text and data-quality counters stay inside the backend (quality counts go to the
+  logs and `npm run sheet:check`).
+- **Request guard:** the `Host` header must be `localhost` or, in a production deployment, one of
+  `ALLOWED_HOSTS` / Render's `RENDER_EXTERNAL_HOSTNAME`; `/api/health` (no data) is exempt for
+  platform health checks. Cross-site browser requests are refused. Client errors use fixed
+  messages. Proxy headers are trusted only for `TRUST_PROXY_HOPS` hops (production only), so rate
+  limiting applies per visitor (see the security model §5).
 
 ## 5. Google Sheets integration [built]
 

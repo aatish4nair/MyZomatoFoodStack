@@ -53,3 +53,17 @@ export function toDisplayName(itemName: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Identity of a (display) food name, ignoring case, punctuation, "&" vs "and" and word order:
+ * "Chicken Tandoori" ≡ "Tandoori Chicken" ≡ "tandoori-chicken". Used to group variants, to match
+ * plate image files to dishes and as the Dish Type key.
+ */
+export const foodNameKey = (name: string): string =>
+  name
+    .replace(/&/g, ' and ')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .sort()
+    .join(' ');

@@ -1,7 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { setReducedMotion } from '../test/setup';
+import { PLACEHOLDER_INTERVAL_MS } from '../features/search/useRotatingPlaceholder';
+import { setFinePointer, setReducedMotion } from '../test/setup';
 import { demoOrderSource } from '../services/demo-order-source';
+import {
+  choose,
+  search,
+  searchbox,
+  suggestion,
+  suggestionList,
+  suggestionNames,
+} from '../test/search-helpers';
 import { App } from './App';
 import { INTRO_FAILSAFE_MS } from './intro';
 
@@ -16,17 +25,15 @@ async function renderReady() {
   return view;
 }
 
-const search = (value: string) => {
-  fireEvent.change(screen.getByRole('searchbox', { name: 'Search your food orders' }), {
-    target: { value },
-  });
+const pickMonth = (value: string) => {
+  fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), { target: { value } });
 };
 
 describe('App', () => {
   it('renders the title with "Zomato" as the red brand word', async () => {
     await renderReady();
     expect(
-      screen.getByRole('heading', { level: 1, name: 'My Zomato food Stack' }),
+      screen.getByRole('heading', { level: 1, name: 'My Zomato food stack' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Zomato')).toHaveClass('app__brand');
   });
@@ -56,23 +63,29 @@ describe('App', () => {
     expect(container.querySelector('.app')).toHaveClass('app--ready');
   });
 
-  it('shows the latest month by default and lists every month', async () => {
+  it('opens on All Months, then lists the months grouped by year, newest first', async () => {
     await renderReady();
     const select = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Month' });
-    expect(select.value).toBe('2026-10');
+    expect(select.value).toBe('all');
     expect(
       within(select)
         .getAllByRole('option')
         .map((o) => o.textContent),
-    ).toEqual(['October 2026', 'September 2026', 'August 2026', 'All months']);
+    ).toEqual(['All Months', 'October 2026', 'September 2026', 'August 2026']);
+    // The year is a group label (not a selectable option), below a divider.
+    expect(within(select).getByRole('group', { name: '2026' })).toBeInTheDocument();
+    expect(select.querySelectorAll('hr')).toHaveLength(1);
+    // All Months shows results from every month.
+    choose('tandoori', 'Tandoori Chicken');
+    expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent(
+      '(2 orders in total)',
+    );
   });
 
-  it('shows one result and its plate artwork for a match, without brackets', async () => {
+  it('shows one result and its plate artwork for a picked dish, without brackets', async () => {
     await renderReady();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), {
-      target: { value: '2026-09' },
-    });
-    search('chicken tandoori');
+    pickMonth('2026-09');
+    choose('chicken tandoori', 'Tandoori Chicken');
 
     const result = screen.getByRole('region', { name: 'Search result' });
     expect(within(result).getByRole('heading', { level: 2 })).toHaveTextContent(
@@ -98,28 +111,29 @@ describe('App', () => {
     expect(screen.getByTestId('food-pile')).toBeInTheDocument();
   });
 
-  it('updates the result when the month changes', async () => {
+  it('updates the picked result when the month changes', async () => {
     await renderReady();
-    search('tandoori');
+    pickMonth('2026-10');
+    choose('tandoori', 'Tandoori Chicken');
     expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent('₹373 paid'); // ₹372.50 rounds half up
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), { target: { value: 'all' } });
+    pickMonth('all');
     expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent('₹739 paid'); // rounded from the exact total 73854 paise
     expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent(
       '(2 orders in total)',
     );
   });
 
-  it('keeps the same plate element while the user keeps typing', async () => {
+  it('keeps the same plate element when the month changes for the same dish', async () => {
     await renderReady();
-    search('idl');
+    choose('idl', 'Idly');
     const first = screen.getByRole('img', { name: 'Idly' });
-    search('idly');
+    pickMonth('2026-10');
     expect(screen.getByRole('img', { name: 'Idly' })).toBe(first);
   });
 
   it('returns to the empty state when the search is cleared', async () => {
     await renderReady();
-    search('idly');
+    choose('idly', 'Idly');
     expect(screen.getAllByRole('img')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(screen.queryByRole('img')).toBeNull();
@@ -128,79 +142,150 @@ describe('App', () => {
 
   it('shows a restrained message and no picture when nothing matches', async () => {
     await renderReady();
+    pickMonth('2026-10');
     search('sushi');
+    expect(suggestionList()).toBeNull();
     expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent(
       'No orders for “sushi” in October 2026.',
     );
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('shows a neutral empty plate (no picture) for a matched food without suitable artwork', async () => {
+  it('shows a neutral empty plate (no picture) for a picked food without suitable artwork', async () => {
     await renderReady();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), {
-      target: { value: '2026-09' },
-    });
-    search('paneer tikka');
+    pickMonth('2026-09');
+    choose('paneer tikka', 'Paneer Tikka');
     expect(screen.getByRole('region', { name: 'Search result' })).toHaveTextContent('Paneer Tikka');
     expect(screen.getByTestId('plate-placeholder')).toBeInTheDocument();
     expect(screen.queryByRole('img')).toBeNull();
   });
 
-  it('asks which variant for a generic query, then shows the chosen food', async () => {
+  it('typing lists suggestions but never selects anything, even a single letter', async () => {
     await renderReady();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), { target: { value: 'all' } });
-    search('momos');
-    const result = screen.getByRole('region', { name: 'Search result' });
-    expect(within(result).getByText('Which momos are you looking for?')).toBeInTheDocument();
-    const options = within(result).getAllByRole('button');
-    expect(options.map((b) => b.textContent)).toEqual([
-      'Chicken Fried Momos, 1 order',
-      'Steamed Veg Momos, 1 order',
-    ]);
-    // The question is not a result: no count, no name heading, no plate.
-    expect(within(result).queryByRole('heading')).toBeNull();
-    expect(screen.queryByTestId('plate-placeholder')).toBeNull();
+    search('c');
+    expect(suggestionNames().length).toBeGreaterThan(0);
+    expect(searchbox()).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Search result' })).toBeEmptyDOMElement();
     expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByTestId('plate-placeholder')).toBeNull();
+  });
 
-    fireEvent.click(within(result).getByRole('button', { name: /Steamed Veg Momos/ }));
-    expect(screen.getByRole('searchbox')).toHaveValue('Steamed Veg Momos');
-    expect(screen.getByRole('searchbox')).toHaveFocus();
+  it('waits for an explicit choice even when the exact dish name is typed', async () => {
+    await renderReady();
+    search('chicken zinger burger');
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    expect(suggestionNames()).toEqual(['Chicken Zinger Burger']);
+  });
+
+  it('suggests the category first, then dishes, and picking a dish shows only that dish', async () => {
+    await renderReady();
+    search('momos');
+    expect(suggestionNames()).toEqual([
+      'Momos · All variants',
+      'Chicken Fried Momos',
+      'Steamed Veg Momos',
+    ]);
+    fireEvent.click(suggestion('Steamed Veg Momos'));
+    expect(searchbox()).toHaveValue('Steamed Veg Momos');
+    expect(suggestionList()).toBeNull();
+    const result = screen.getByRole('region', { name: 'Search result' });
     expect(within(result).getByRole('heading', { level: 2 })).toHaveTextContent(
       'Steamed Veg Momos',
     );
     expect(result).toHaveTextContent('Quantity: 2 (1 order in total).');
   });
 
-  it('shows an exact food name directly without asking', async () => {
+  it('shows every variant of a category across all months, and only the month’s otherwise', async () => {
     await renderReady();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), { target: { value: 'all' } });
-    search('chicken zinger burger');
-    expect(screen.queryByText(/are you looking for/)).toBeNull();
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Chicken Zinger Burger');
+    choose('momo', 'Momos · All variants');
+    const result = screen.getByRole('region', { name: 'Search result' });
+    expect(searchbox()).toHaveValue('Momos');
+    expect(within(result).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Momos · All variants',
+    );
+    expect(result).toHaveTextContent('Orders: 2');
+    expect(result).toHaveTextContent('₹427 paid'); // 238 + 189, both momos-only orders
+    expect(result).toHaveTextContent(
+      'Includes Chicken Fried Momos (1 order), Steamed Veg Momos (1 order).',
+    );
+    pickMonth('2026-09');
+    expect(result).toHaveTextContent('Orders: 1');
+    expect(result).toHaveTextContent('Includes Steamed Veg Momos (1 order).');
+    pickMonth('2026-10');
+    expect(result).toHaveTextContent('No orders for “Momos” in October 2026.');
   });
 
-  it('shows the only variant directly (no question) when just one food matches', async () => {
+  it('never attributes a whole order’s total to a dish ordered with other dishes', async () => {
     await renderReady();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Month' }), {
-      target: { value: '2026-09' },
-    });
-    search('momos'); // September only has Steamed Veg Momos
-    expect(screen.queryByText(/are you looking for/)).toBeNull();
+    choose('pizza', 'Pizza · All variants');
+    const result = screen.getByRole('region', { name: 'Search result' });
+    expect(result).toHaveTextContent('Orders: 2');
+    // Margherita came with Garlic Breadsticks (a side), so only the Farmhouse order is priced.
+    expect(result).toHaveTextContent('₹299 paid (excludes 1 order that also had other dishes)');
+    choose('margherita', 'Margherita Pizza');
+    expect(result).toHaveTextContent(
+      'Amount not known (always ordered with other dishes; there are no item prices)',
+    );
+  });
+
+  it('supports the keyboard: arrows highlight, Enter picks the highlighted one, Escape closes', async () => {
+    await renderReady();
+    search('momos');
+    const input = searchbox();
+    // Enter with nothing highlighted does not pick anything.
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(input).toHaveAttribute('aria-activedescendant', suggestion('Chicken Fried Momos').id);
+    expect(suggestion('Chicken Fried Momos')).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    fireEvent.keyDown(input, { key: 'ArrowUp' }); // wraps to the last one
+    expect(input).toHaveAttribute('aria-activedescendant', suggestion('Steamed Veg Momos').id);
+    fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Steamed Veg Momos');
+
+    // Escape closes the list without changing the text; a second Escape clears the field.
+    search('momo');
+    expect(suggestionList()).not.toBeNull();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(suggestionList()).toBeNull();
+    expect(input).toHaveValue('momo');
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input).toHaveValue('');
+  });
+
+  it('closes the suggestions when clicking elsewhere, without selecting', async () => {
+    await renderReady();
+    search('momos');
+    fireEvent.pointerDown(screen.getByRole('heading', { level: 1 }));
+    expect(suggestionList()).toBeNull();
+    expect(searchbox()).toHaveValue('momos');
+    expect(screen.getByRole('region', { name: 'Search result' })).toBeEmptyDOMElement();
+  });
+
+  it('keeps the month menu independent: suggestions follow the selected month', async () => {
+    await renderReady();
+    pickMonth('2026-09');
+    search('momos');
+    expect(suggestionNames()).toEqual(['Momos · All variants', 'Steamed Veg Momos']);
+    pickMonth('all');
+    expect(suggestionNames()).toContain('Chicken Fried Momos');
   });
 
   it('rotates real food names in the placeholder, with brackets removed', async () => {
     await renderReady();
     vi.useFakeTimers();
-    // Restart the rotation under fake timers (focus pauses it, blur on an empty field resumes it).
-    const input = screen.getByRole('searchbox');
-    fireEvent.focus(input);
-    fireEvent.blur(input);
+    // Restart the rotation under fake timers (typing pauses it, clearing the field resumes it).
+    search('x');
+    search('');
     const seen = new Set<string>();
     for (let i = 0; i < 25; i++) {
       seen.add(screen.getByTestId('search-placeholder').textContent);
       act(() => {
-        vi.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(PLACEHOLDER_INTERVAL_MS);
       });
     }
     expect(seen.size).toBeGreaterThan(10);
@@ -250,5 +335,95 @@ describe('App', () => {
     expect(screen.queryByTestId('search-placeholder')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
     expect(container.querySelector('.food-pile')).toBeInTheDocument();
+  });
+});
+
+describe('keeping the search field ready for typing', () => {
+  const monthSelect = () => screen.getByRole('combobox', { name: 'Month' });
+
+  it('focuses the search field when the page is revealed (mouse/trackpad devices)', async () => {
+    setFinePointer(true);
+    await renderReady();
+    // Focus is set in an effect right after the reveal; wait for it rather than racing it.
+    await waitFor(() => {
+      expect(searchbox()).toHaveFocus();
+    });
+  });
+
+  it('puts the focus back after a click on a non-interactive area', async () => {
+    setFinePointer(true);
+    await renderReady();
+    monthSelect().focus();
+    fireEvent.click(screen.getByRole('heading', { level: 1 }));
+    expect(searchbox()).toHaveFocus();
+    monthSelect().focus();
+    fireEvent.click(document.body);
+    expect(searchbox()).toHaveFocus();
+  });
+
+  it('does not take the focus from a control that is clicked', async () => {
+    setFinePointer(true);
+    await renderReady();
+    monthSelect().focus();
+    fireEvent.click(monthSelect());
+    expect(monthSelect()).toHaveFocus();
+  });
+
+  it('returns to the field after a month is picked with the mouse', async () => {
+    setFinePointer(true);
+    await renderReady();
+    monthSelect().focus();
+    fireEvent.pointerDown(monthSelect());
+    pickMonth('2026-09');
+    expect(monthSelect()).toHaveValue('2026-09');
+    expect(searchbox()).toHaveFocus();
+  });
+
+  it('leaves the focus on the month menu while it is used with the keyboard', async () => {
+    setFinePointer(true);
+    await renderReady();
+    monthSelect().focus();
+    fireEvent.keyDown(monthSelect(), { key: 'ArrowDown' });
+    pickMonth('2026-08');
+    expect(monthSelect()).toHaveValue('2026-08');
+    expect(monthSelect()).toHaveFocus();
+  });
+
+  it('does not refocus when the click selected some text', async () => {
+    setFinePointer(true);
+    await renderReady();
+    monthSelect().focus();
+    vi.spyOn(window, 'getSelection').mockReturnValue({ isCollapsed: false } as Selection);
+    fireEvent.click(screen.getByRole('heading', { level: 1 }));
+    expect(monthSelect()).toHaveFocus();
+  });
+
+  it('keeps the focus in the field when a suggestion or the clear button is used', async () => {
+    setFinePointer(true);
+    await renderReady();
+    searchbox().focus();
+    choose('momos', 'Steamed Veg Momos');
+    expect(searchbox()).toHaveFocus();
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(searchbox()).toHaveValue('');
+    expect(searchbox()).toHaveFocus();
+  });
+
+  it('never moves the focus by itself on touch devices (no surprise keyboard)', async () => {
+    await renderReady();
+    expect(searchbox()).not.toHaveFocus();
+    fireEvent.click(screen.getByRole('heading', { level: 1 }));
+    expect(searchbox()).not.toHaveFocus();
+  });
+
+  it('removes its listeners when the page unmounts', async () => {
+    setFinePointer(true);
+    const removed = vi.spyOn(document, 'removeEventListener');
+    const view = await renderReady();
+    view.unmount();
+    const types = removed.mock.calls.map(([type]) => type);
+    for (const type of ['pointerdown', 'keydown', 'click', 'change']) expect(types).toContain(type);
   });
 });

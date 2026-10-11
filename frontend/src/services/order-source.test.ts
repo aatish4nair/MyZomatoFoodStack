@@ -1,26 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiOrderSource, defaultOrderSource, OrdersUnavailableError } from './order-source';
 
+/** A public API order (opaque ID; no time or raw status). */
 const ORDER = {
-  orderId: 'A1',
+  orderId: 'o0001',
   orderDate: '2026-09-28',
-  orderTime: '20:15',
   restaurant: 'Imaginary Tandoor',
   totalPaidPaise: 36604,
-  status: 'Delivered',
   statusCategory: 'successful',
   items: [{ name: 'Tandoori Chicken (breast Pcs)', quantity: 1 }],
 };
 const OK_BODY = {
   month: 'all',
   orders: [{ ...ORDER, gmailMessageId: 'should-be-dropped' }],
-  quality: {
-    rowsRead: 1,
-    blankRows: 0,
-    rejectedRows: 0,
-    ordersWithConflictingTotals: 0,
-    ordersMissingTotal: 0,
-  },
   freshness: { fetchedAt: '2026-10-10T00:00:00.000Z', stale: false },
 };
 
@@ -38,6 +30,11 @@ describe('apiOrderSource', () => {
     expect(fetchSpy).toHaveBeenCalledWith('/api/orders?month=all', expect.anything());
     expect(orders[0]?.items[0]?.name).toBe('Tandoori Chicken (breast Pcs)');
     expect(JSON.stringify(orders)).not.toContain('should-be-dropped');
+  });
+
+  it('rejects a response carrying a real Zomato order ID instead of an opaque one', async () => {
+    mockFetch(200, { ...OK_BODY, orders: [{ ...ORDER, orderId: '7123456789' }] });
+    await expect(apiOrderSource.loadOrders()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
   it('surfaces the backend’s safe error code', async () => {
