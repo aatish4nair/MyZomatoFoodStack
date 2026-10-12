@@ -113,6 +113,14 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<backend>.onrender.com/api/orde
 
 - `403`: the request's hostname isn't allowed (see `ALLOWED_HOSTS`).
 
+**Opening a data endpoint in the browser.** Paste `https://<backend>.onrender.com/api/orders` (or
+`https://<static-site>.onrender.com/api/orders`) into the address bar. If you instead **click** a
+link to it on another website (the Render dashboard, a chat app, an email, a document), the browser
+marks the request as cross-site (`Sec-Fetch-Site: cross-site`) and the API answers `403` with
+"Cross-site requests are not allowed." This is intended: it stops other websites from linking to or
+embedding the order data. It doesn't affect the website itself, whose requests are same-origin
+through the `/api/*` rewrite, or `curl`, which sends no such header.
+
 ## 2. Frontend: Render Static Site
 
 | Setting           | Value                                                           |

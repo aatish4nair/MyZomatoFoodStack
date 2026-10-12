@@ -266,6 +266,38 @@ describe('public deployment (production settings)', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
+  it('serves the data to a URL pasted into the address bar, but not to a link from another site', async () => {
+    await startProd();
+    const navigation = { host: 'my-api.onrender.com', 'sec-fetch-mode': 'navigate' };
+    // Typed or pasted into the address bar: the browser sends Sec-Fetch-Site: none.
+    const typed = await get('/api/orders', { ...navigation, 'sec-fetch-site': 'none' });
+    expect(typed.statusCode).toBe(200);
+    expect(OrdersResponseSchema.parse(typed.json()).orders).toHaveLength(3);
+    // The same URL clicked on another website: refused.
+    const clicked = await get('/api/orders', { ...navigation, 'sec-fetch-site': 'cross-site' });
+    expect(clicked.statusCode).toBe(403);
+    expect(ApiErrorSchema.parse(clicked.json()).message).toBe(
+      'Cross-site requests are not allowed.',
+    );
+    expect(clicked.body).not.toContain('Imaginary Tandoor');
+  });
+
+  it("serves the website's own requests forwarded by the static site's /api/* rewrite", async () => {
+    await startProd();
+    // The page fetches /api/orders on its own origin; the static site forwards it to the API.
+    const res = await get('/api/orders?month=all', {
+      host: 'my-site.onrender.com',
+      'sec-fetch-site': 'same-origin',
+      'sec-fetch-mode': 'cors',
+      'x-forwarded-for': '203.0.113.7',
+    });
+    expect(res.statusCode).toBe(200);
+    const body = OrdersResponseSchema.parse(res.json());
+    expect(body.month).toBe('all');
+    expect(body.orders).toHaveLength(3);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
   it('rate-limits per visitor behind one proxy hop, and a forged address does not help', async () => {
     await startProd({ RATE_LIMIT_MAX: '2' });
     // Render's proxy appends the real client address; a visitor may prepend a forged one.
